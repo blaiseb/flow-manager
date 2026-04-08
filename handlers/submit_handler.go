@@ -75,9 +75,18 @@ func SubmitHandler(c *gin.Context) {
 		}
 
 		for _, port := range ports {
+			source := sub.SourceIP
+			if source == "" && sub.SourceFQDN != "" {
+				source = sub.SourceFQDN // Cas externe
+			}
+			target := sub.TargetIP
+			if target == "" && sub.TargetFQDN != "" {
+				target = sub.TargetFQDN // Cas externe
+			}
+
 			flow := models.FlowRequest{
-				SourceIP:   sub.SourceIP,
-				TargetIP:   sub.TargetIP,
+				SourceIP:   source,
+				TargetIP:   target,
 				Protocol:   sub.Protocol,
 				Port:       port,
 				TimeLimit:  timeLimit,

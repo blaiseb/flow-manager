@@ -121,20 +121,20 @@
                                     <td>
                                         {{ if .SourceFQDN }}
                                             <a href="/?tab=view&search={{ .SourceFQDN }}">{{ .SourceFQDN }}</a>
+                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
-                                            <span class="text-muted">Subnet/IP</span>
+                                            <a href="/?tab=view&search={{ .SourceIP }}">{{ .SourceIP }}</a>
+                                            <br><small class="text-muted">Externe / Subnet</small>
                                         {{ end }}
-                                        <br>
-                                        <small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                     </td>
                                     <td>
                                         {{ if .TargetFQDN }}
                                             <a href="/?tab=view&search={{ .TargetFQDN }}">{{ .TargetFQDN }}</a>
+                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
-                                            <span class="text-muted">Subnet/IP</span>
+                                            <a href="/?tab=view&search={{ .TargetIP }}">{{ .TargetIP }}</a>
+                                            <br><small class="text-muted">Externe / Subnet</small>
                                         {{ end }}
-                                        <br>
-                                        <small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                     </td>
                                     <td>{{ .Protocol }}</td>
 
@@ -427,24 +427,27 @@
             row.id = `row-${idx}`;
             row.className = 'form-row-inputs';
 
-            // Générer les options du select VLAN
-            let vlanOptions = '<option value="">-- Machine isolée --</option>';
+            // Générer les options du select de périmètre
+            let scopeOptions = `
+                <option value="">-- Machine isolée --</option>
+                <option value="EXTERNAL">-- Externe (FQDN) --</option>
+            `;
             availableVlans.forEach(v => {
-                vlanOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`;
+                scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`;
             });
 
             row.innerHTML = `
                 <td>
-                    <select class="form-select form-select-sm mb-1" onchange="selectVlan(this, ${idx}, 'source')">
-                        ${vlanOptions}
+                    <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">
+                        ${scopeOptions}
                     </select>
                     <input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto">
                 </td>
                 <td><input type="text" name="flows[${idx}].source_ip" class="form-control" id="source_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><input type="text" name="flows[${idx}].source_fqdn" class="form-control" id="source_fqdn_${idx}" placeholder="FQDN" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td>
-                    <select class="form-select form-select-sm mb-1" onchange="selectVlan(this, ${idx}, 'target')">
-                        ${vlanOptions}
+                    <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'target')">
+                        ${scopeOptions}
                     </select>
                     <input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto">
                 </td>
@@ -464,24 +467,34 @@
             });
         }
 
-        function selectVlan(selectEl, idx, type) {
-            const subnet = selectEl.value;
+        function selectScope(selectEl, idx, type) {
+            const val = selectEl.value;
             const ipInput = document.getElementById(`${type}_ip_${idx}`);
             const fqdnInput = document.getElementById(`${type}_fqdn_${idx}`);
             const vlanNameInput = document.getElementById(`${type}_vlan_${idx}`);
 
-            if (subnet) {
-                ipInput.value = subnet;
+            if (val === "EXTERNAL") {
+                ipInput.value = "";
+                ipInput.disabled = true;
+                ipInput.placeholder = "N/A (Externe)";
+                fqdnInput.disabled = false;
+                fqdnInput.placeholder = "Domaine / FQDN (ex: google.com)";
+                vlanNameInput.value = "EXTERNE";
+            } else if (val) {
+                // Mode VLAN
+                ipInput.value = val;
+                ipInput.disabled = false;
                 fqdnInput.value = "";
                 fqdnInput.disabled = true;
                 fqdnInput.placeholder = "Réseau entier";
-                // Trouver le nom du VLAN pour le champ readonly
-                const vlan = availableVlans.find(v => v.subnet === subnet);
+                const vlan = availableVlans.find(v => v.subnet === val);
                 if (vlan) vlanNameInput.value = vlan.name;
             } else {
+                // Mode Machine isolée
+                ipInput.disabled = false;
                 fqdnInput.disabled = false;
                 fqdnInput.placeholder = "FQDN";
-                ipInput.value = "";
+                ipInput.placeholder = "IP ou Subnet";
                 vlanNameInput.value = "";
             }
         }

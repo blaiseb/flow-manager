@@ -31,6 +31,11 @@ func ViewHandler(c *gin.Context) {
 	if err := database.DB.Find(&cis).Error; err != nil {
 		logger.Error("Failed to fetch CIs", "error", err)
 	}
+
+	// Dynamically match VLAN for each CI in the management list
+	for i := range cis {
+		cis[i].Vlan = database.MatchVLAN(cis[i].IP, vlans)
+	}
 	
 	database.DB.Model(&models.FlowRequest{}).Distinct().Pluck("reference", &references)
 
