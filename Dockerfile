@@ -29,6 +29,7 @@ COPY --from=builder /app/flow-manager .
 
 # Copy templates and default config
 COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/static ./static
 COPY --from=builder /app/config.yaml.example ./config.yaml.example
 
 # Create a data directory for the SQLite database

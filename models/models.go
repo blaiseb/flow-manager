@@ -10,8 +10,8 @@ import (
 // CI represents a Configuration Item.
 type CI struct {
 	gorm.Model
-	Hostname    string      `json:"hostname" gorm:"index"`
-	IP          string      `json:"ip" gorm:"unique;index"`
+	Hostname    string      `json:"hostname" gorm:"index;not null" binding:"required"`
+	IP          string      `json:"ip" gorm:"unique;index;not null" binding:"required,ip"`
 	Description string      `json:"description"`
 	Vlan        *VlanSubnet `json:"vlan" gorm:"-"`
 }
@@ -24,16 +24,16 @@ func (ci *CI) BeforeSave(tx *gorm.DB) (err error) {
 // FlowRequest represents a unique flow request, associated by IP/Subnet only.
 type FlowRequest struct {
 	gorm.Model
-	SourceIP      string     `json:"source_ip" gorm:"index"`
-	TargetIP      string     `json:"target_ip" gorm:"index"`
-	Protocol      string     `json:"protocol" gorm:"index"`
-	Port          int        `json:"port" gorm:"index"`
+	SourceIP      string     `json:"source_ip" gorm:"index;not null" binding:"required"`
+	TargetIP      string     `json:"target_ip" gorm:"index;not null" binding:"required"`
+	Protocol      string     `json:"protocol" gorm:"index;not null" binding:"required,oneof=TCP UDP BOTH ICMP"`
+	Port          int        `json:"port" gorm:"index;not null" binding:"min=0,max=65535"`
 	TimeLimit     *time.Time `json:"time_limit"`
 	Comment       string     `json:"comment"`
-	Reference     string     `json:"reference" gorm:"index"`
+	Reference     string     `json:"reference" gorm:"index;not null"`
 	RuleNumber    string     `json:"rule_number"`
 	ImplementedAt *time.Time `json:"implemented_at"`
-	Status        string     `json:"status" gorm:"default:'demandé'"`
+	Status        string     `json:"status" gorm:"default:'demandé';not null"`
 
 	// Associations SQL
 	SourceCI *CI `json:"-" gorm:"foreignKey:SourceIP;references:IP"`
@@ -55,9 +55,9 @@ const (
 
 type User struct {
 	gorm.Model
-	Username string `json:"username" gorm:"unique;index"`
-	Password string `json:"-"` // Hashé
-	Role     string `json:"role" gorm:"default:'viewer'"`
+	Username string `json:"username" gorm:"unique;index;not null" binding:"required,min=3"`
+	Password string `json:"-" gorm:"not null"` // Hashé
+	Role     string `json:"role" gorm:"default:'viewer';not null" binding:"required,oneof=viewer requestor actor admin"`
 }
 
 func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {
@@ -71,8 +71,8 @@ func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {
 // VlanSubnet represents a VLAN / Subnet.
 type VlanSubnet struct {
 	gorm.Model
-	Subnet     string `json:"subnet" gorm:"unique"`
-	VLAN       string `json:"vlan"`
+	Subnet     string `json:"subnet" gorm:"unique;not null" binding:"required"`
+	VLAN       string `json:"vlan" gorm:"not null" binding:"required"`
 	Gateway    string `json:"gateway"`
 	DNSServers string `json:"dns_servers"`
 }

@@ -24,24 +24,43 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
 
 ## 🛠️ Stack Technique
 
-- **Langage** : Go (Golang)
+- **Langage** : Go (Golang 1.26+)
 - **Framework Web** : [Gin Gonic](https://github.com/gin-gonic/gin)
 - **ORM** : [GORM](https://gorm.io/)
-- **Base de données** : SQLite (format local `flows.db`)
+- **Sécurité** : CSRF Protection, OIDC (OpenID Connect), Bcrypt hashing
+- **Base de données** : SQLite ou PostgreSQL
 - **Interface** : HTML5, Bootstrap 5.3, JavaScript (Vanilla)
 - **Excel** : [Excelize](https://github.com/xuri/excelize)
 
-## 📦 Installation & Déploiement
+## 🔐 Sécurité & Configuration
+
+L'application utilise des variables d'environnement pour la configuration sensible :
+
+| Variable | Description | Par défaut |
+| :--- | :--- | :--- |
+| `FLOW_SESSION_SECRET` | Secret pour les sessions et CSRF (**Obligatoire en prod**) | `dev-secret-key` |
+| `INITIAL_ADMIN_PASSWORD` | Mot de passe de l'admin par défaut au 1er boot | `admin` |
+| `GIN_MODE` | Mode de fonctionnement de Gin (`release` ou `debug`) | `debug` |
+
+### Authentification OIDC
+Pour activer OIDC, configurez la section `auth.oidc` dans votre `config.yaml`. L'application gère automatiquement le rafraîchissement des jetons et la protection contre les attaques CSRF via un jeton `state` aléatoire.
+
+## 🚀 Installation & Déploiement
 
 ### Installation Locale
-1. Assurez-vous d'avoir Go installé (version 1.21+ recommandée).
+1. Assurez-vous d'avoir Go installé (version 1.21+ recommandée, 1.26 testée).
 2. Clonez le dépôt et installez les dépendances :
    ```bash
    go mod tidy
    ```
-3. Compilez et lancez :
+3. Testez l'application :
+   ```bash
+   go test ./...
+   ```
+4. Compilez et lancez :
    ```bash
    go build -o flow-manager main.go
+   export FLOW_SESSION_SECRET="votre-secret-tres-long"
    ./flow-manager
    ```
 
