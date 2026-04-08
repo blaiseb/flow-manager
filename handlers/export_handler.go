@@ -28,6 +28,8 @@ func (h *Handler) GenerateExcelFile(flows []models.FlowRequest) (*excelize.File,
 		ciMap[ci.IP] = ci
 	}
 
+	parsedVlans := database.PreParseSubnets(vlans)
+
 	f := excelize.NewFile()
 	sheet := "Flux"
 	index, err := f.NewSheet(sheet)
@@ -105,7 +107,7 @@ func (h *Handler) GenerateExcelFile(flows []models.FlowRequest) (*excelize.File,
 			srcHostname = ci.Hostname
 		}
 		srcVlanName := "Inconnu"
-		if v := database.MatchVLAN(flow.SourceIP, vlans); v != nil {
+		if v := database.MatchVLANOptimized(flow.SourceIP, parsedVlans); v != nil {
 			srcVlanName = v.VLAN
 		}
 
@@ -116,7 +118,7 @@ func (h *Handler) GenerateExcelFile(flows []models.FlowRequest) (*excelize.File,
 			tgtHostname = ci.Hostname
 		}
 		tgtVlanName := "Inconnu"
-		if v := database.MatchVLAN(flow.TargetIP, vlans); v != nil {
+		if v := database.MatchVLANOptimized(flow.TargetIP, parsedVlans); v != nil {
 			tgtVlanName = v.VLAN
 		}
 

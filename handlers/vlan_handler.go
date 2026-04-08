@@ -25,7 +25,7 @@ func (h *Handler) ImportVlans(c *gin.Context) {
 	reader.Comma = ','
 	reader.FieldsPerRecord = -1
 
-	var created, updated int
+	var created, updated, failed int
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -33,19 +33,27 @@ func (h *Handler) ImportVlans(c *gin.Context) {
 		}
 		if err != nil {
 			logger.Warn("Error reading CSV record during VLAN import", "error", err)
+			failed++
 			continue
 		}
 
-		if len(record) > 0 && (strings.ToLower(record[0]) == "subnet") {
+		if len(record) > 0 && (strings.ToLower(strings.TrimSpace(record[0])) == "subnet") {
 			continue
 		}
 
 		if len(record) < 2 {
+			failed++
+			continue
+		}
+
+		subnet := strings.TrimSpace(record[0])
+		if subnet == "" {
+			failed++
 			continue
 		}
 
 		vlanData := models.VlanSubnet{
-			Subnet: strings.TrimSpace(record[0]),
+			Subnet: subnet,
 			VLAN:   strings.TrimSpace(record[1]),
 		}
 		if len(record) >= 3 {
@@ -61,20 +69,29 @@ func (h *Handler) ImportVlans(c *gin.Context) {
 			existing.VLAN = vlanData.VLAN
 			existing.Gateway = vlanData.Gateway
 			existing.DNSServers = vlanData.DNSServers
-			h.DB.Save(&existing)
-			updated++
+			if err := h.DB.Save(&existing).Error; err != nil {
+				logger.Error("Failed to update VLAN during import", "subnet", subnet, "error", err)
+				failed++
+			} else {
+				updated++
+			}
 		} else {
-			h.DB.Create(&vlanData)
-			created++
+			if err := h.DB.Create(&vlanData).Error; err != nil {
+				logger.Error("Failed to create VLAN during import", "subnet", subnet, "error", err)
+				failed++
+			} else {
+				created++
+			}
 		}
 	}
 
-	logger.Info("VLAN import completed", "created", created, "updated", updated)
+	logger.Info("VLAN import completed", "created", created, "updated", updated, "failed", failed)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Import completed",
+		"message": "Import terminé",
 		"created": created,
 		"updated": updated,
+		"failed":  failed,
 	})
 }
 

@@ -63,7 +63,7 @@ func (h *Handler) ImportCIs(c *gin.Context) {
 		descIdx = 2
 	}
 
-	var created, updated int
+	var created, updated, failed int
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -71,24 +71,25 @@ func (h *Handler) ImportCIs(c *gin.Context) {
 		}
 		if err != nil {
 			logger.Warn("Error reading CSV record during CI import", "error", err)
+			failed++
 			continue
 		}
 
 		if len(record) <= hostnameIdx || len(record) <= ipIdx {
+			failed++
 			continue
 		}
 
 		ip := strings.TrimSpace(record[ipIdx])
 		hostname := strings.TrimSpace(record[hostnameIdx])
+		if ip == "" {
+			failed++
+			continue
+		}
+
 		description := ""
 		if hasDesc && len(record) > descIdx {
 			description = strings.TrimSpace(record[descIdx])
-		} else if !hasDesc && len(record) > 2 {
-			description = strings.TrimSpace(record[2])
-		}
-
-		if ip == "" {
-			continue
 		}
 
 		var existing models.CI
@@ -99,6 +100,7 @@ func (h *Handler) ImportCIs(c *gin.Context) {
 			existing.Description = description
 			if err := h.DB.Unscoped().Save(&existing).Error; err != nil {
 				logger.Error("Failed to update CI during import", "ip", ip, "error", err)
+				failed++
 			} else {
 				updated++
 			}
@@ -110,24 +112,31 @@ func (h *Handler) ImportCIs(c *gin.Context) {
 			}
 			if err := h.DB.Create(&newCi).Error; err != nil {
 				logger.Error("Failed to create CI during import", "ip", ip, "error", err)
+				failed++
 			} else {
 				created++
 			}
 		}
 	}
 
-	logger.Info("CI import completed", "created", created, "updated", updated)
-	c.JSON(http.StatusOK, gin.H{"message": "Import completed", "created": created, "updated": updated})
+	logger.Info("CI import completed", "created", created, "updated", updated, "failed", failed)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Import terminé",
+		"created": created,
+		"updated": updated,
+		"failed":  failed,
+	})
 }
 
 // ExportCIs exports all CIs to a comma-delimited CSV file.
-// Order: IP, Hostname, Description, VLAN
 func (h *Handler) ExportCIs(c *gin.Context) {
 	var cis []models.CI
 	var vlans []models.VlanSubnet
 	if err := h.DB.Find(&vlans).Error; err != nil {
 		logger.Error("Failed to fetch VLANs for CI export", "error", err)
 	}
+	parsedVlans := database.PreParseSubnets(vlans)
+
 	if err := h.DB.Find(&cis).Error; err != nil {
 		logger.Error("Failed to fetch CIs for export", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch CIs"})
@@ -144,7 +153,7 @@ func (h *Handler) ExportCIs(c *gin.Context) {
 
 	for _, ci := range cis {
 		vlanName := "Inconnu"
-		if v := database.MatchVLAN(ci.IP, vlans); v != nil {
+		if v := database.MatchVLANOptimized(ci.IP, parsedVlans); v != nil {
 			vlanName = v.VLAN
 		}
 		writer.Write([]string{
@@ -160,13 +169,13 @@ func (h *Handler) ExportCIs(c *gin.Context) {
 // CreateCI handles the creation of a new CI.
 func (h *Handler) CreateCI(c *gin.Context) {
 	var input struct {
-		Hostname    string `json:"hostname"`
-		IP          string `json:"ip"`
+		Hostname    string `json:"hostname" binding:"required"`
+		IP          string `json:"ip" binding:"required,ip"`
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		logger.Warn("Failed to bind JSON for CI creation", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données invalides : " + err.Error()})
 		return
 	}
 
@@ -218,12 +227,12 @@ func (h *Handler) UpdateCI(c *gin.Context) {
 	}
 
 	var input struct {
-		Hostname    string `json:"hostname"`
-		IP          string `json:"ip"`
+		Hostname    string `json:"hostname" binding:"required"`
+		IP          string `json:"ip" binding:"required,ip"`
 		Description string `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données invalides : " + err.Error()})
 		return
 	}
 

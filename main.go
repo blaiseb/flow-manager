@@ -2,16 +2,13 @@ package main
 
 import (
 	"flag"
-	"flow-manager/auth"
 	"flow-manager/config"
 	"flow-manager/database"
 	"flow-manager/handlers"
 	"flow-manager/logger"
-	"flow-manager/models"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -58,49 +55,10 @@ func main() {
 	gin.DefaultWriter = io.MultiWriter(logFile, os.Stdout)
 
 	db := database.InitDatabase()
+	database.SeedDefaultData(db)
+	
 	handlers.InitOIDC()
 	h := handlers.NewHandler(db)
-
-	// Ensure admin user has hashed password
-	var admin models.User
-	if err := db.Where("username = ?", "admin").First(&admin).Error; err == nil {
-		// If password is still plain "admin", hash it
-		if admin.Password == "admin" || !strings.HasPrefix(admin.Password, "$2a$") {
-			initialPassword := os.Getenv("INITIAL_ADMIN_PASSWORD")
-			if initialPassword == "" {
-				initialPassword = "admin"
-				logger.Warn("Admin password is still 'admin' and no INITIAL_ADMIN_PASSWORD found. Please change it immediately.")
-			}
-			hashed, err := auth.HashPassword(initialPassword)
-			if err != nil {
-				logger.Fatal("Failed to hash admin password", "error", err)
-			}
-			admin.Password = hashed
-			db.Save(&admin)
-			logger.Info("Admin password was plain or invalid format, updated to hashed version.")
-		}
-	} else {
-		// Create admin if doesn't exist
-		initialPassword := os.Getenv("INITIAL_ADMIN_PASSWORD")
-		if initialPassword == "" {
-			initialPassword = "admin"
-			logger.Warn("Creating default admin user 'admin' with password 'admin'. Please set INITIAL_ADMIN_PASSWORD next time.")
-		}
-		hashed, err := auth.HashPassword(initialPassword)
-		if err != nil {
-			logger.Fatal("Failed to hash default admin password", "error", err)
-		}
-		newAdmin := models.User{
-			Username: "admin",
-			Password: hashed,
-			Role:     models.RoleAdmin,
-		}
-		if err := db.Create(&newAdmin).Error; err != nil {
-			logger.Error("Failed to create default admin user", "error", err)
-		} else {
-			logger.Info("Default admin user 'admin' created.")
-		}
-	}
 
 	var router *gin.Engine
 	if logger.DebugMode {
