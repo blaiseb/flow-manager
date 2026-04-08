@@ -183,7 +183,11 @@ func SeedDefaultData(db *gorm.DB) {
 		initialPassword = "admin"
 	}
 
-	hashed, _ := bcrypt.GenerateFromPassword([]byte(initialPassword), 14)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(initialPassword), 14)
+	if err != nil {
+		logger.Error("Failed to hash initial admin password", "error", err)
+		return
+	}
 
 	if err == nil {
 		// If password is still plain "admin" or not bcrypt, update it

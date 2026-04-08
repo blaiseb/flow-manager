@@ -200,12 +200,12 @@ func (h *Handler) Logout(c *gin.Context) {
 // CreateUser handles the creation of a new user.
 func (h *Handler) CreateUser(c *gin.Context) {
 	var input struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Role     string `json:"role"`
+		Username string `json:"username" binding:"required,min=3"`
+		Password string `json:"password" binding:"required"`
+		Role     string `json:"role" binding:"required,oneof=viewer requestor actor admin"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données invalides : " + err.Error()})
 		return
 	}
 
@@ -239,12 +239,12 @@ func (h *Handler) UpdateUser(c *gin.Context) {
 	}
 
 	var input struct {
-		Username string `json:"username"`
+		Username string `json:"username" binding:"required,min=3"`
 		Password string `json:"password"`
-		Role     string `json:"role"`
+		Role     string `json:"role" binding:"required,oneof=viewer requestor actor admin"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données invalides : " + err.Error()})
 		return
 	}
 
