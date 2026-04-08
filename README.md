@@ -57,11 +57,12 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
 3. **Initialisation** : Commencez par importer vos VLANs via l'onglet "VLANs > Importer CSV" pour activer la résolution dynamique.
 
 ### Format d'import/export VLAN (CSV)
-Le fichier doit être au format texte avec des colonnes séparées par des **espaces** :
+Le fichier doit être au format CSV avec des colonnes séparées par des **virgules** (`,`). 
+Si plusieurs serveurs DNS sont renseignés, ils doivent être séparés par des **espaces** au sein de leur colonne :
 ```text
-subnet name gateway dns
-192.168.1.0/24 VLAN_SERVERS 192.168.1.254 1.1.1.1,8.8.8.8
-10.0.0.0/8 VLAN_CORP 10.0.0.1 10.0.0.2
+subnet,name,gateway,dns
+192.168.1.0/24,VLAN_SERVERS,192.168.1.254,1.1.1.1 8.8.8.8
+10.0.0.0/8,VLAN_CORP,10.0.0.1,10.0.0.2 10.0.0.3
 ```
 
 ## 📂 Structure du Projet

@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ImportVlans handles bulk import of VLANs from a CSV file (space-delimited).
+// ImportVlans handles bulk import of VLANs from a CSV file (comma-delimited).
 func ImportVlans(c *gin.Context) {
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
@@ -22,7 +22,7 @@ func ImportVlans(c *gin.Context) {
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	reader.Comma = ' ' // Délimiteur espace comme demandé
+	reader.Comma = ',' // Délimiteur virgule
 	reader.FieldsPerRecord = -1 // Flexible number of fields
 
 	var created, updated int
@@ -92,7 +92,7 @@ func ExportVlans(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment;filename=vlans_export.csv")
 
 	writer := csv.NewWriter(c.Writer)
-	writer.Comma = ' ' // Délimiteur espace identique à l'import
+	writer.Comma = ',' // Délimiteur virgule
 
 	// En-tête
 	writer.Write([]string{"subnet", "name", "gateway", "dns"})
