@@ -53,6 +53,10 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
    ```bash
    ./flow-manager
    ```
+   *Optionnel* : Pour activer le mode debug (logs détaillés, SQL GORM, mode développement Gin) :
+   ```bash
+   ./flow-manager --debug
+   ```
 2. Accédez à l'interface via votre navigateur : `http://localhost:8080`
 3. **Initialisation** : Commencez par importer vos VLANs via l'onglet "VLANs > Importer CSV" pour activer la résolution dynamique.
 

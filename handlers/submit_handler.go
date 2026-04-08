@@ -1,14 +1,14 @@
 package handlers
 
 import (
+	"flow-manager/database"
+	"flow-manager/logger"
+	"flow-manager/models"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-
-	"flow-manager/database"
-	"flow-manager/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,11 +26,12 @@ type FlowSubmission struct {
 
 func SubmitHandler(c *gin.Context) {
 	if err := c.Request.ParseForm(); err != nil {
+		logger.Error("Failed to parse submission form", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
 		return
 	}
 
-	// Generate a common Reference for this submission
+	action := c.PostForm("action") // "generate" or "validate"
 	reference := "REF-" + time.Now().Format("20060102-150405")
 
 	// Group fields by row index
@@ -57,7 +58,8 @@ func SubmitHandler(c *gin.Context) {
 		}
 	}
 
-	var newFlows []models.FlowRequest
+	var flowsToExport []models.FlowRequest
+	
 	for _, sub := range rows {
 		ports := parsePorts(sub.Ports)
 		if len(ports) == 0 {
@@ -83,30 +85,46 @@ func SubmitHandler(c *gin.Context) {
 				Reference:  reference,
 				Status:     "demandé",
 			}
-			database.DB.Create(&flow)
-			newFlows = append(newFlows, flow)
+			
+			if action == "validate" {
+				if err := database.DB.Create(&flow).Error; err != nil {
+					logger.Error("Failed to create flow request", "error", err)
+				}
+			}
+			
+			// We need FQDNs for the Excel generation (even if not saved)
+			flow.SourceFQDN = sub.SourceFQDN
+			flow.TargetFQDN = sub.TargetFQDN
+			
+			flowsToExport = append(flowsToExport, flow)
 		}
 		
-		if sub.SourceFQDN != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
-			ensureCI(sub.SourceFQDN, sub.SourceIP)
-		}
-		if sub.TargetFQDN != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
-			ensureCI(sub.TargetFQDN, sub.TargetIP)
+		if action == "validate" {
+			if sub.SourceFQDN != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
+				ensureCI(sub.SourceFQDN, sub.SourceIP)
+			}
+			if sub.TargetFQDN != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
+				ensureCI(sub.TargetFQDN, sub.TargetIP)
+			}
 		}
 	}
 
-	// Generate and return Excel for these NEW flows only
-	if len(newFlows) > 0 {
-		f, err := GenerateExcelFile(newFlows)
+	if action == "generate" {
+		logger.Info("Generating Excel request (preview)", "count", len(flowsToExport))
+		f, err := GenerateExcelFile(flowsToExport)
 		if err == nil {
-			fileName := fmt.Sprintf("demande_%s.xlsx", reference)
+			fileName := fmt.Sprintf("demande_draft_%s.xlsx", reference)
 			c.Header("Content-Type", "application/octet-stream")
 			c.Header("Content-Disposition", "attachment; filename="+fileName)
 			f.Write(c.Writer)
 			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel"})
+		return
 	}
 
+	// For action "validate", we redirect to the view page
+	logger.Info("Flows validated and saved", "reference", reference, "count", len(flowsToExport))
 	c.Redirect(http.StatusSeeOther, "/?tab=view")
 }
 
@@ -138,8 +156,10 @@ func ensureCI(fqdn, ip string) {
 	var ci models.CI
 	err := database.DB.Where("ip = ?", ip).First(&ci).Error
 	if err != nil {
+		logger.Debug("Auto-creating CI", "fqdn", fqdn, "ip", ip)
 		database.DB.Create(&models.CI{FQDN: fqdn, IP: ip})
 	} else if ci.FQDN == "" && fqdn != "" {
+		logger.Debug("Updating existing CI FQDN", "ip", ip, "new_fqdn", fqdn)
 		ci.FQDN = fqdn
 		database.DB.Save(&ci)
 	}

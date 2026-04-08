@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"flow-manager/database"
+	"flow-manager/logger"
+	"flow-manager/models"
 	"net/http"
 	"strings"
-
-	"flow-manager/database"
-	"flow-manager/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,9 +18,10 @@ func CiLookupHandler(c *gin.Context) {
 		return
 	}
 
+	logger.Debug("CI Lookup", "query", query)
+
 	query = strings.ToLower(query)
 	var ci models.CI
-	// Search by IP or FQDN
 	err := database.DB.Where("ip = ? OR fqdn = ?", query, query).First(&ci).Error
 
 	if err != nil {
@@ -28,7 +29,6 @@ func CiLookupHandler(c *gin.Context) {
 		return
 	}
 
-	// Dynamic VLAN calculation for the lookup response
 	var vlans []models.VlanSubnet
 	if err := database.DB.Find(&vlans).Error; err == nil {
 		ci.Vlan = database.MatchVLAN(ci.IP, vlans)
@@ -44,6 +44,8 @@ func CiSuggestHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, []models.CI{})
 		return
 	}
+
+	logger.Debug("CI Suggestion", "query", query)
 
 	var cis []models.CI
 	searchTerm := query + "%"

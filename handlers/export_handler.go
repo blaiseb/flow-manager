@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"flow-manager/database"
+	"flow-manager/logger"
+	"flow-manager/models"
 	"fmt"
 	"net/http"
 	"time"
-
-	"flow-manager/database"
-	"flow-manager/models"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
@@ -92,6 +92,7 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 
 // ExportHandler generates an Excel file of all flow requests.
 func ExportHandler(c *gin.Context) {
+	logger.Info("Generating complete flows export")
 	var flows []models.FlowRequest
 	database.DB.Order("created_at desc").Find(&flows)
 

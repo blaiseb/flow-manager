@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"net/http"
-
 	"flow-manager/database"
+	"flow-manager/logger"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +15,8 @@ func VlanLookupHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "IP address is required"})
 		return
 	}
+
+	logger.Debug("VLAN Lookup", "ip", ipQuery)
 
 	vlan, err := database.FindVLAN(ipQuery)
 	if err != nil {

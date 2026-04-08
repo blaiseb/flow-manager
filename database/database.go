@@ -2,12 +2,12 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"flow-manager/models"
+	"flow-manager/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -31,7 +31,7 @@ func FindVLAN(ipStr string) (*models.VlanSubnet, error) {
 	for _, s := range subnets {
 		_, cidrNet, err := net.ParseCIDR(s.Subnet)
 		if err != nil {
-			log.Printf("Invalid CIDR in database: %s", s.Subnet)
+			logger.Warn("Invalid CIDR in database", "subnet", s.Subnet)
 			continue
 		}
 		if cidrNet.Contains(ip) {
@@ -99,24 +99,33 @@ func inc(ip net.IP) {
 // InitDatabase initialise la connexion à la base de données et migre les schémas.
 func InitDatabase() {
 	var err error
+	
+	// Determine database log level based on DebugMode
+	dbLogLevel := gormlogger.Silent
+	if logger.DebugMode {
+		dbLogLevel = gormlogger.Info
+	} else {
+		dbLogLevel = gormlogger.Error
+	}
+
 	DB, err = gorm.Open(sqlite.Open("flows.db"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info), // Active le logging SQL
+		Logger: gormlogger.Default.LogMode(dbLogLevel), // Logging SQL selon mode
 	})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
 	// Migration automatique des modèles pour créer/mettre à jour les tables.
 	err = DB.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{})
 	if err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		logger.Fatal("Failed to migrate database", "error", err)
 	}
 
 	// Insérer des données de test pour les VLANs si la table est vide.
 	var count int64
 	DB.Model(&models.VlanSubnet{}).Count(&count)
 	if count == 0 {
-		log.Println("Seeding VlanSubnet table with initial data...")
+		logger.Info("Seeding VlanSubnet table with initial data...")
 		vlans := []models.VlanSubnet{
 			{Subnet: "192.168.1.0/24", VLAN: "VLAN_SERVERS"},
 			{Subnet: "10.0.0.0/8", VLAN: "VLAN_CORP"},
@@ -124,9 +133,9 @@ func InitDatabase() {
 			{Subnet: "::1/128", VLAN: "VLAN_LOCALHOST"},
 		}
 		if err := DB.Create(&vlans).Error; err != nil {
-			log.Fatalf("Failed to seed VlanSubnet table: %v", err)
+			logger.Fatal("Failed to seed VlanSubnet table", "error", err)
 		}
 	}
 
-	log.Println("Database connection successful and schemas migrated.")
+	logger.Info("Database connection successful and schemas migrated.")
 }

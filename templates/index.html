@@ -54,12 +54,12 @@
                             <table class="table table-bordered align-middle">
                                 <thead class="form-row-header">
                                     <tr>
-                                        <th>FQDN Source</th>
-                                        <th>IP Source</th>
                                         <th>VLAN Source</th>
-                                        <th>FQDN Cible</th>
-                                        <th>IP Cible</th>
+                                        <th>IP Source</th>
+                                        <th>FQDN Source</th>
                                         <th>VLAN Target</th>
+                                        <th>IP Target</th>
+                                        <th>FQDN Cible</th>
                                         <th>Protocole</th>
                                         <th>Port(s)</th>
                                         <th>Limite Temporelle</th>
@@ -70,8 +70,12 @@
                                 <tbody id="form-body"></tbody>
                             </table>
                         </div>
+                        <input type="hidden" name="action" id="form-action" value="validate">
                         <button type="button" class="btn btn-primary mt-2" onclick="addRow()">Ajouter une ligne</button>
-                        <button type="submit" class="btn btn-success mt-2 float-end">Valider la demande</button>
+                        <div class="float-end mt-2">
+                            <button type="submit" class="btn btn-info me-2" onclick="document.getElementById('form-action').value='generate'">Générer l'Excel (Brouillon)</button>
+                            <button type="submit" class="btn btn-success" onclick="document.getElementById('form-action').value='validate'">Valider et Enregistrer</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -409,19 +413,43 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let rowIndex = 0;
+        // Injecter les VLANs depuis le template Go vers JS
+        const availableVlans = [
+            {{ range .VLANs }}
+            { id: {{.ID}}, name: "{{.VLAN}}", subnet: "{{.Subnet}}" },
+            {{ end }}
+        ];
+
         function addRow() {
             const tbody = document.getElementById('form-body');
             const idx = rowIndex++;
             const row = document.createElement('tr');
             row.id = `row-${idx}`;
             row.className = 'form-row-inputs';
+
+            // Générer les options du select VLAN
+            let vlanOptions = '<option value="">-- Machine isolée --</option>';
+            availableVlans.forEach(v => {
+                vlanOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`;
+            });
+
             row.innerHTML = `
-                <td><input type="text" name="flows[${idx}].source_fqdn" class="form-control" id="source_fqdn_${idx}" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].source_ip" class="form-control" id="source_ip_${idx}" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly></td>
-                <td><input type="text" name="flows[${idx}].target_fqdn" class="form-control" id="target_fqdn_${idx}" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].target_ip" class="form-control" id="target_ip_${idx}" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly></td>
+                <td>
+                    <select class="form-select form-select-sm mb-1" onchange="selectVlan(this, ${idx}, 'source')">
+                        ${vlanOptions}
+                    </select>
+                    <input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto">
+                </td>
+                <td><input type="text" name="flows[${idx}].source_ip" class="form-control" id="source_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
+                <td><input type="text" name="flows[${idx}].source_fqdn" class="form-control" id="source_fqdn_${idx}" placeholder="FQDN" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
+                <td>
+                    <select class="form-select form-select-sm mb-1" onchange="selectVlan(this, ${idx}, 'target')">
+                        ${vlanOptions}
+                    </select>
+                    <input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto">
+                </td>
+                <td><input type="text" name="flows[${idx}].target_ip" class="form-control" id="target_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
+                <td><input type="text" name="flows[${idx}].target_fqdn" class="form-control" id="target_fqdn_${idx}" placeholder="FQDN" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><select name="flows[${idx}].protocol" class="form-select"><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="BOTH">TCP & UDP</option></select></td>
                 <td><input type="text" name="flows[${idx}].ports" class="form-control" placeholder="80, 443"></td>
                 <td><input type="date" name="flows[${idx}].time_limit" class="form-control"></td>
@@ -434,6 +462,28 @@
                     document.getElementById(id).addEventListener('change', e => lookupCI(e.target.value, idx, t));
                 });
             });
+        }
+
+        function selectVlan(selectEl, idx, type) {
+            const subnet = selectEl.value;
+            const ipInput = document.getElementById(`${type}_ip_${idx}`);
+            const fqdnInput = document.getElementById(`${type}_fqdn_${idx}`);
+            const vlanNameInput = document.getElementById(`${type}_vlan_${idx}`);
+
+            if (subnet) {
+                ipInput.value = subnet;
+                fqdnInput.value = "";
+                fqdnInput.disabled = true;
+                fqdnInput.placeholder = "Réseau entier";
+                // Trouver le nom du VLAN pour le champ readonly
+                const vlan = availableVlans.find(v => v.subnet === subnet);
+                if (vlan) vlanNameInput.value = vlan.name;
+            } else {
+                fqdnInput.disabled = false;
+                fqdnInput.placeholder = "FQDN";
+                ipInput.value = "";
+                vlanNameInput.value = "";
+            }
         }
 
         async function updateSuggestions(query) {
