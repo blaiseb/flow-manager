@@ -47,19 +47,27 @@ func SubmitHandler(c *gin.Context) {
 		val := values[0]
 		field := key[strings.Index(key, "].")+2:]
 		switch field {
-		case "source_hostname": rows[idx].SourceHostname = val
-		case "source_ip":       rows[idx].SourceIP = val
-		case "target_hostname": rows[idx].TargetHostname = val
-		case "target_ip":       rows[idx].TargetIP = val
-		case "protocol":        rows[idx].Protocol = val
-		case "ports":           rows[idx].Ports = val
-		case "time_limit":      rows[idx].TimeLimit = val
-		case "comment":         rows[idx].Comment = val
+		case "source_hostname":
+			rows[idx].SourceHostname = val
+		case "source_ip":
+			rows[idx].SourceIP = val
+		case "target_hostname":
+			rows[idx].TargetHostname = val
+		case "target_ip":
+			rows[idx].TargetIP = val
+		case "protocol":
+			rows[idx].Protocol = val
+		case "ports":
+			rows[idx].Ports = val
+		case "time_limit":
+			rows[idx].TimeLimit = val
+		case "comment":
+			rows[idx].Comment = val
 		}
 	}
 
 	var flowsToExport []models.FlowRequest
-	
+
 	for _, sub := range rows {
 		ports := parsePorts(sub.Ports)
 		if len(ports) == 0 {
@@ -85,29 +93,29 @@ func SubmitHandler(c *gin.Context) {
 			}
 
 			flow := models.FlowRequest{
-				SourceIP:   source,
-				TargetIP:   target,
-				Protocol:   sub.Protocol,
-				Port:       port,
-				TimeLimit:  timeLimit,
-				Comment:    sub.Comment,
-				Reference:  reference,
-				Status:     "demandé",
+				SourceIP:  source,
+				TargetIP:  target,
+				Protocol:  sub.Protocol,
+				Port:      port,
+				TimeLimit: timeLimit,
+				Comment:   sub.Comment,
+				Reference: reference,
+				Status:    "demandé",
 			}
-			
+
 			if action == "validate" {
 				if err := database.DB.Create(&flow).Error; err != nil {
 					logger.Error("Failed to create flow request", "error", err)
 				}
 			}
-			
+
 			// We need Hostnames for the Excel generation (even if not saved)
 			flow.SourceHostname = sub.SourceHostname
 			flow.TargetHostname = sub.TargetHostname
-			
+
 			flowsToExport = append(flowsToExport, flow)
 		}
-		
+
 		if action == "validate" {
 			if sub.SourceHostname != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
 				ensureCI(sub.SourceHostname, sub.SourceIP)
@@ -132,9 +140,58 @@ func SubmitHandler(c *gin.Context) {
 		return
 	}
 
+	if action == "markdown" {
+		logger.Info("Generating Markdown request (preview)", "count", len(flowsToExport))
+		md := GenerateMarkdown(flowsToExport)
+		c.JSON(http.StatusOK, gin.H{"markdown": md})
+		return
+	}
+
 	// For action "validate", we redirect to the view page
 	logger.Info("Flows validated and saved", "reference", reference, "count", len(flowsToExport))
 	c.Redirect(http.StatusSeeOther, "/?tab=view")
+}
+
+func GenerateMarkdown(flows []models.FlowRequest) string {
+	var sb strings.Builder
+	sb.WriteString("bonjour, \nPouvez-vous réaliser les ouvertures de flux suivantes, \n\n")
+	sb.WriteString("| Source | Destination | Protocole | Port | Commentaire |\n")
+	sb.WriteString("| :--- | :--- | :--- | :--- | :--- |\n")
+
+	for _, f := range flows {
+		source := f.SourceIP
+		if f.SourceHostname != "" {
+			if f.SourceIP != "" {
+				source = fmt.Sprintf("%s (%s)", f.SourceHostname, f.SourceIP)
+			} else {
+				source = f.SourceHostname
+			}
+		}
+		target := f.TargetIP
+		if f.TargetHostname != "" {
+			if f.TargetIP != "" {
+				target = fmt.Sprintf("%s (%s)", f.TargetHostname, f.TargetIP)
+			} else {
+				target = f.TargetHostname
+			}
+		}
+
+		comment := f.Comment
+		if f.TimeLimit != nil {
+			if comment != "" {
+				comment += " "
+			}
+			comment += fmt.Sprintf("(Jusqu'au %s)", f.TimeLimit.Format("2006-01-02"))
+		}
+
+		portStr := strconv.Itoa(f.Port)
+		if f.Port == 0 {
+			portStr = "Any"
+		}
+
+		sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n", source, target, f.Protocol, portStr, comment))
+	}
+	return sb.String()
 }
 
 func parsePorts(s string) []int {
