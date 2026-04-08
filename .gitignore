@@ -1,0 +1,37 @@
+# Binaires et exécutables
+/flow-manager
+/flow-manager.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Base de données SQLite (données locales)
+/flows.db
+/flows.db-journal
+/flows.db-shm
+/flows.db-wal
+
+# Logs de l'application
+/flow-manager.log
+*.log
+
+# Fichiers générés (Exports Excel/CSV)
+/*.xlsx
+/*.csv
+!/templates/*.csv
+
+# Dépendances Go (optionnel si vous utilisez vendor/, mais ici on utilise go.mod)
+# vendor/
+
+# Fichiers système et IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+# Répertoires temporaires
+/tmp/
+.gemini/
