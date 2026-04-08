@@ -127,6 +127,7 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "index.html", gin.H{
+		"_csrf":        c.GetString("_csrf"),
 		"User":         currentUser,
 		"Users":        users,
 		"Flows":        flows,

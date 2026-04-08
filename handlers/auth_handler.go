@@ -65,7 +65,9 @@ func (h *Handler) ShowLogin(c *gin.Context) {
 		c.Redirect(http.StatusFound, oidcConfig.AuthCodeURL(state))
 		return
 	}
-	c.HTML(http.StatusOK, "login.html", gin.H{})
+	c.HTML(http.StatusOK, "login.html", gin.H{
+		"_csrf": c.GetString("_csrf"),
+	})
 }
 
 // OIDCCallback handles the callback from the OIDC provider.

@@ -113,11 +113,12 @@ func main() {
 	// Session management
 	sessionSecret := config.Global.Server.Secret
 	if sessionSecret == "" {
-		if !logger.DebugMode {
-			logger.Fatal("FLOW_SESSION_SECRET or server.secret config is missing!")
+		sessionSecret = "dev-secret-key-change-me-in-production"
+		if os.Getenv("GIN_MODE") == "release" {
+			logger.Fatal("FLOW_SESSION_SECRET or server.secret config is missing! Required in release mode.")
+		} else {
+			logger.Warn("FLOW_SESSION_SECRET is missing. Using an insecure default secret. DO NOT USE IN PRODUCTION!")
 		}
-		sessionSecret = "dev-secret-key"
-		logger.Warn("Using insecure session secret in debug mode")
 	}
 	store := cookie.NewStore([]byte(sessionSecret))
 	router.Use(sessions.Sessions("flow_session", store))
