@@ -54,6 +54,25 @@ func FindVLAN(db *gorm.DB, ipStr string) (*models.VlanSubnet, error) {
 	return nil, fmt.Errorf("no matching VLAN found")
 }
 
+// MatchVLAN finds the matching VLAN for an IP from a pre-fetched slice of subnets (non-optimized).
+func MatchVLAN(ipStr string, subnets []models.VlanSubnet) *models.VlanSubnet {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil
+	}
+
+	for i := range subnets {
+		_, cidrNet, err := net.ParseCIDR(subnets[i].Subnet)
+		if err != nil {
+			continue
+		}
+		if cidrNet.Contains(ip) {
+			return &subnets[i]
+		}
+	}
+	return nil
+}
+
 type ParsedSubnet struct {
 	Net    *net.IPNet
 	Source *models.VlanSubnet
@@ -117,7 +136,7 @@ func GetIPsFromSubnet(cidr string) ([]string, error) {
 		inc(ip)
 	}
 
-	ones, bits := ipnet.Mask.Size()
+	ones, bits = ipnet.Mask.Size()
 	if bits == 32 && ones <= 30 && len(ips) >= 4 {
 		return ips[1 : len(ips)-1], nil
 	}

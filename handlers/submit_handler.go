@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"fmt"
@@ -24,24 +25,63 @@ type FlowSubmission struct {
 }
 
 type Submission struct {
-	Action string                    `form:"action"`
-	Flows  map[string]FlowSubmission `form:"flows"`
+	Action string           `form:"action"`
+	Flows  []FlowSubmission `form:"flows"`
 }
 
 // SubmitHandler handles the submission of flow requests from the web form.
 func (h *Handler) SubmitHandler(c *gin.Context) {
-	var input Submission
-	if err := c.ShouldBind(&input); err != nil {
-		logger.Error("Failed to bind submission form", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Données de formulaire invalides"})
+	if err := c.Request.ParseForm(); err != nil {
+		logger.Error("Failed to parse submission form", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
 		return
 	}
 
-	action := input.Action
+	action := c.PostForm("action")
 	if action == "" {
 		action = "validate"
 	}
 	reference := "REF-" + time.Now().Format("20060102-150405")
+
+	// Group fields by row index (manual parsing to support flows[idx].field format)
+	rows := make(map[string]*FlowSubmission)
+	for key, values := range c.Request.PostForm {
+		if !strings.HasPrefix(key, "flows[") {
+			continue
+		}
+		closeBracket := strings.Index(key, "]")
+		if closeBracket == -1 {
+			continue
+		}
+		idx := key[6:closeBracket]
+		if _, ok := rows[idx]; !ok {
+			rows[idx] = &FlowSubmission{}
+		}
+		val := values[0]
+		fieldIdx := strings.Index(key, "].")
+		if fieldIdx == -1 {
+			continue
+		}
+		field := key[fieldIdx+2:]
+		switch field {
+		case "source_hostname":
+			rows[idx].SourceHostname = val
+		case "source_ip":
+			rows[idx].SourceIP = val
+		case "target_hostname":
+			rows[idx].TargetHostname = val
+		case "target_ip":
+			rows[idx].TargetIP = val
+		case "protocol":
+			rows[idx].Protocol = val
+		case "ports":
+			rows[idx].Ports = val
+		case "time_limit":
+			rows[idx].TimeLimit = val
+		case "comment":
+			rows[idx].Comment = val
+		}
+	}
 
 	var flowsToExport []models.FlowRequest
 
@@ -52,7 +92,7 @@ func (h *Handler) SubmitHandler(c *gin.Context) {
 	}
 	parsedVlans := database.PreParseSubnets(vlans)
 
-	for _, sub := range input.Flows {
+	for _, sub := range rows {
 		ports := parsePorts(sub.Ports)
 		if len(ports) == 0 {
 			ports = []int{0}

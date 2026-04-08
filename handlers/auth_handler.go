@@ -22,6 +22,31 @@ var (
 	oidcVerifier *oidc.IDTokenVerifier
 )
 
+// InitOIDC initializes the OIDC provider and configuration.
+func InitOIDC() {
+	if config.Global.Auth.Type != "oidc" {
+		return
+	}
+
+	ctx := context.Background()
+	provider, err := oidc.NewProvider(ctx, config.Global.Auth.OIDC.Issuer)
+	if err != nil {
+		logger.Fatal("Failed to get OIDC provider", "error", err)
+	}
+
+	oidcProvider = provider
+	oidcConfig = oauth2.Config{
+		ClientID:     config.Global.Auth.OIDC.ClientID,
+		ClientSecret: config.Global.Auth.OIDC.ClientSecret,
+		Endpoint:     provider.Endpoint(),
+		RedirectURL:  config.Global.Auth.OIDC.RedirectURL,
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+	}
+
+	oidcVerifier = provider.Verifier(&oidc.Config{ClientID: config.Global.Auth.OIDC.ClientID})
+	logger.Info("OIDC initialized", "issuer", config.Global.Auth.OIDC.Issuer)
+}
+
 func generateState() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

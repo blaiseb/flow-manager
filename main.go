@@ -63,8 +63,7 @@ func main() {
 
 	// Ensure admin user has hashed password
 	var admin models.User
-	err = db.Where("username = ?", "admin").First(&admin).Error
-	if err == nil {
+	if err := db.Where("username = ?", "admin").First(&admin).Error; err == nil {
 		// If password is still plain "admin", hash it
 		if admin.Password == "admin" || !strings.HasPrefix(admin.Password, "$2a$") {
 			initialPassword := os.Getenv("INITIAL_ADMIN_PASSWORD")
