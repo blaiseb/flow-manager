@@ -23,7 +23,12 @@ func ViewHandler(c *gin.Context) {
 	var vlans []models.VlanSubnet
 	var cis []models.CI
 	var references []string
+	var users []models.User
 	activeTab := c.DefaultQuery("tab", "home")
+
+	// Current User
+	loggedUser, _ := c.Get("user")
+	currentUser := loggedUser.(models.User)
 
 	if err := database.DB.Find(&vlans).Error; err != nil {
 		logger.Error("Failed to fetch VLANs", "error", err)
@@ -32,14 +37,17 @@ func ViewHandler(c *gin.Context) {
 		logger.Error("Failed to fetch CIs", "error", err)
 	}
 
-	// Dynamically match VLAN for each CI in the management list
+	// Fetch users only if admin
+	if currentUser.Role == models.RoleAdmin {
+		database.DB.Find(&users)
+	}
+
 	for i := range cis {
 		cis[i].Vlan = database.MatchVLAN(cis[i].IP, vlans)
 	}
 	
 	database.DB.Model(&models.FlowRequest{}).Distinct().Pluck("reference", &references)
 
-	// Map CIs for fast lookup
 	ciMap := make(map[string]models.CI)
 	for _, ci := range cis {
 		ciMap[ci.IP] = ci
@@ -49,13 +57,10 @@ func ViewHandler(c *gin.Context) {
 	if searchQuery != "" {
 		activeTab = "view"
 		searchTerm := "%" + searchQuery + "%"
-		logger.Debug("Filtering flows", "query", searchQuery)
 		
-		// 1. Find IPs of CIs matching the Hostname
 		var matchingIPs []string
 		database.DB.Model(&models.CI{}).Where("hostname LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Pluck("ip", &matchingIPs)
 
-		// 2. Build the query including reference field
 		if len(matchingIPs) > 0 {
 			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ? OR source_ip IN ? OR target_ip IN ?", 
 				searchTerm, searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs)
@@ -67,7 +72,6 @@ func ViewHandler(c *gin.Context) {
 
 	db.Order("created_at desc").Find(&flows)
 
-	// Dynamically populate display fields for flows
 	for i := range flows {
 		if ci, ok := ciMap[flows[i].SourceIP]; ok {
 			flows[i].SourceHostname = ci.Hostname
@@ -80,7 +84,6 @@ func ViewHandler(c *gin.Context) {
 		flows[i].TargetVlan = database.MatchVLAN(flows[i].TargetIP, vlans)
 	}
 
-	// VLAN Detail Logic
 	var selectedVlan *models.VlanSubnet
 	var vlanIPs []IPInfo
 	vlanIDParam := c.Query("vlan_id")
@@ -93,7 +96,6 @@ func ViewHandler(c *gin.Context) {
 			}
 		}
 		if selectedVlan != nil {
-			logger.Debug("Loading VLAN detail", "vlan", selectedVlan.VLAN)
 			ips, _ := database.GetIPsFromSubnet(selectedVlan.Subnet)
 			for _, ipStr := range ips {
 				info := IPInfo{IP: ipStr}
@@ -108,6 +110,8 @@ func ViewHandler(c *gin.Context) {
 	}
 
 	c.HTML(http.StatusOK, "index.html", gin.H{
+		"User":         currentUser,
+		"Users":        users,
 		"Flows":        flows,
 		"VLANs":        vlans,
 		"CIs":          cis,

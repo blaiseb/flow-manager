@@ -128,7 +128,7 @@ func InitDatabase() {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
-	err = DB.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{})
+	err = DB.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{})
 	if err != nil {
 		logger.Fatal("Failed to migrate database", "error", err)
 	}

@@ -20,9 +20,11 @@
 
         <!-- Onglets de navigation principaux -->
         <ul class="nav nav-tabs" id="myTab" role="tablist">
+            {{ if (or (eq .User.Role "requestor") (eq .User.Role "actor") (eq .User.Role "admin")) }}
             <li class="nav-item">
                 <button class="nav-link {{ if eq .ActiveTab "home" }}active{{ end }}" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button">Nouvelle Demande</button>
             </li>
+            {{ end }}
             <li class="nav-item">
                 <button class="nav-link {{ if eq .ActiveTab "view" }}active{{ end }}" id="view-tab" data-bs-toggle="tab" data-bs-target="#view-tab-pane" type="button">Consulter les Flux</button>
             </li>
@@ -32,8 +34,20 @@
             <li class="nav-item">
                 <button class="nav-link {{ if eq .ActiveTab "ci" }}active{{ end }}" id="ci-tab" data-bs-toggle="tab" data-bs-target="#ci-tab-pane" type="button">Gestion des CI</button>
             </li>
-            <li class="nav-item ms-auto">
-                <a href="/export" class="btn btn-info">Télécharger le rapport Excel</a>
+            {{ if eq .User.Role "admin" }}
+            <li class="nav-item">
+                <button class="nav-link {{ if eq .ActiveTab "admin" }}active{{ end }}" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin-tab-pane" type="button">Administration</button>
+            </li>
+            {{ end }}
+            <li class="nav-item ms-auto dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    {{ .User.Username }} ({{ .User.Role }})
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="/export">Rapport Complet Excel</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="/logout">Déconnexion</a></li>
+                </ul>
             </li>
         </ul>
 
@@ -153,7 +167,11 @@
                                     </td>
                                     <td>{{ .Comment }}</td>
                                     <td>
+                                        {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#flowEditModal" onclick="prepareFlowEditModal({ID: {{.ID}}, RuleNumber: '{{.RuleNumber}}', Status: '{{.Status}}', Comment: '{{.Comment}}'})">Modifier</button>
+                                        {{ else }}
+                                        -
+                                        {{ end }}
                                     </td>
                                 </tr>
                                 {{ else }}
@@ -168,7 +186,6 @@
             <!-- Onglet 3: VLANs (avec sous-onglets) -->
             <div class="tab-pane fade {{ if eq .ActiveTab "vlan" }}show active{{ end }}" id="vlan-tab-pane" role="tabpanel">
                 <div class="mt-3">
-                    <!-- Sous-onglets VLAN -->
                     <ul class="nav nav-pills mb-3" id="vlanSubTab" role="tablist">
                         <li class="nav-item">
                             <button class="nav-link {{ if not .SelectedVlan }}active{{ end }}" id="vlan-list-tab" data-bs-toggle="pill" data-bs-target="#vlan-list-pane" type="button">Référentiel</button>
@@ -181,11 +198,12 @@
                     </ul>
 
                     <div class="tab-content" id="vlanSubTabContent">
-                        <!-- Liste des VLANs -->
                         <div class="tab-pane fade {{ if not .SelectedVlan }}show active{{ end }}" id="vlan-list-pane" role="tabpanel">
                             <div class="mb-3">
+                                {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vlanModal" onclick="prepareVlanModal(null)">Ajouter un VLAN</button>
                                 <button class="btn btn-secondary" onclick="document.getElementById('csvFileInput').click()">Importer CSV</button>
+                                {{ end }}
                                 <a href="/vlan/export" class="btn btn-outline-secondary">Exporter CSV</a>
                                 <input type="file" id="csvFileInput" style="display: none" accept=".csv,.txt" onchange="uploadVlanCSV()">
                             </div>
@@ -206,8 +224,12 @@
                                             <td>{{ .Subnet }}</td>
                                             <td><a href="/?tab=vlan&vlan_id={{ .ID }}">{{ .VLAN }}</a></td>
                                             <td>
+                                                {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#vlanModal" onclick="prepareVlanModal({ID: {{.ID}}, Subnet: '{{.Subnet}}', VLAN: '{{.VLAN}}', Gateway: '{{.Gateway}}', DNSServers: '{{.DNSServers}}'})">Modifier</button>
                                                 <button class="btn btn-sm btn-danger" onclick="deleteVlan({{ .ID }})">Supprimer</button>
+                                                {{ else }}
+                                                -
+                                                {{ end }}
                                             </td>
                                         </tr>
                                         {{ else }}
@@ -218,38 +240,22 @@
                             </div>
                         </div>
 
-                        <!-- Détail d'un VLAN -->
                         {{ if .SelectedVlan }}
                         <div class="tab-pane fade show active" id="vlan-detail-pane" role="tabpanel">
                             <div class="card mb-4">
                                 <div class="card-body">
                                     <div class="row">
-                                        <div class="col-md-4 border-end">
-                                            <strong>Nom du VLAN :</strong><br>
-                                            {{ .SelectedVlan.VLAN }}
-                                        </div>
-                                        <div class="col-md-4 border-end">
-                                            <strong>Gateway :</strong><br>
-                                            {{ if .SelectedVlan.Gateway }}{{ .SelectedVlan.Gateway }}{{ else }}Non définie{{ end }}
-                                        </div>
-                                        <div class="col-md-4">
-                                            <strong>Serveurs DNS :</strong><br>
-                                            {{ if .SelectedVlan.DNSServers }}{{ .SelectedVlan.DNSServers }}{{ else }}Non définis{{ end }}
-                                        </div>
+                                        <div class="col-md-4 border-end"><strong>Nom du VLAN :</strong><br>{{ .SelectedVlan.VLAN }}</div>
+                                        <div class="col-md-4 border-end"><strong>Gateway :</strong><br>{{ if .SelectedVlan.Gateway }}{{ .SelectedVlan.Gateway }}{{ else }}Non définie{{ end }}</div>
+                                        <div class="col-md-4"><strong>Serveurs DNS :</strong><br>{{ if .SelectedVlan.DNSServers }}{{ .SelectedVlan.DNSServers }}{{ else }}Non définis{{ end }}</div>
                                     </div>
                                 </div>
                             </div>
-
                             <h4>Liste des IP du VLAN ({{ .SelectedVlan.Subnet }})</h4>
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped table-hover">
                                     <thead>
-                                        <tr>
-                                            <th>IP</th>
-                                            <th>Hostname</th>
-                                            <th>Description</th>
-                                            <th>Historique</th>
-                                        </tr>
+                                        <tr><th>IP</th><th>Hostname</th><th>Description</th><th>Historique</th></tr>
                                     </thead>
                                     <tbody>
                                         {{ range .VlanIPs }}
@@ -257,9 +263,7 @@
                                             <td><code>{{ .IP }}</code></td>
                                             <td>{{ if .HasCI }}{{ .Hostname }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
                                             <td>{{ if .HasCI }}{{ .Description }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
-                                            <td>
-                                                <a href="/?tab=view&search={{ .IP }}" class="btn btn-sm btn-link p-0">Voir flux</a>
-                                            </td>
+                                            <td><a href="/?tab=view&search={{ .IP }}" class="btn btn-sm btn-link p-0">Voir flux</a></td>
                                         </tr>
                                         {{ end }}
                                     </tbody>
@@ -276,191 +280,105 @@
                 <div class="mt-3">
                     <h4>Référentiel des Configuration Items (CI)</h4>
                     <div class="mb-3">
+                        {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal(null)">Ajouter un CI</button>
                         <button class="btn btn-secondary" onclick="document.getElementById('ciCsvFileInput').click()">Importer CSV</button>
+                        {{ end }}
                         <a href="/ci/export" class="btn btn-outline-secondary">Exporter CSV</a>
                         <input type="file" id="ciCsvFileInput" style="display: none" accept=".csv,.txt" onchange="uploadCiCSV()">
                     </div>
                     <div class="table-responsive">
                         <table class="table table-striped table-hover">
                             <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>IP</th>
-                                    <th>Hostname</th>
-                                    <th>Description</th>
-                                    <th>VLAN</th>
-                                    <th>Dernière Mise à jour</th>
-                                    <th>Actions</th>
-                                </tr>
+                                <tr><th>ID</th><th>IP</th><th>Hostname</th><th>Description</th><th>VLAN</th><th>Dernière Mise à jour</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 {{ range .CIs }}
                                 <tr>
-                                    <td>{{ .ID }}</td>
-                                    <td>{{ .IP }}</td>
-                                    <td>{{ .Hostname }}</td>
-                                    <td>{{ .Description }}</td>
-                                    <td>{{ if .Vlan }}{{ .Vlan.VLAN }}{{ else }}Non défini{{ end }}</td>
-                                    <td>{{ .UpdatedAt.Format "02/01/2006 15:04" }}</td>
+                                    <td>{{ .ID }}</td><td>{{ .IP }}</td><td>{{ .Hostname }}</td><td>{{ .Description }}</td><td>{{ if .Vlan }}{{ .Vlan.VLAN }}{{ else }}Non défini{{ end }}</td><td>{{ .UpdatedAt.Format "02/01/2006 15:04" }}</td>
                                     <td>
+                                        {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                                         <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal({ID: {{.ID}}, Hostname: '{{.Hostname}}', IP: '{{.IP}}', Description: '{{.Description}}'})">Modifier</button>
                                         <button class="btn btn-sm btn-danger" onclick="deleteCi({{ .ID }})">Supprimer</button>
+                                        {{ else }}-{{ end }}
                                     </td>
                                 </tr>
-                                {{ else }}
-                                <tr><td colspan="7" class="text-center">Aucun CI à afficher.</td></tr>
-                                {{ end }}
+                                {{ else }}<tr><td colspan="7" class="text-center">Aucun CI à afficher.</td></tr>{{ end }}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            <!-- Onglet 5: Administration -->
+            {{ if eq .User.Role "admin" }}
+            <div class="tab-pane fade {{ if eq .ActiveTab "admin" }}show active{{ end }}" id="admin-tab-pane" role="tabpanel">
+                <div class="mt-3">
+                    <ul class="nav nav-pills mb-3" id="adminSubTab" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" id="admin-users-tab" data-bs-toggle="pill" data-bs-target="#admin-users-pane" type="button">Utilisateurs</button></li>
+                    </ul>
+                    <div class="tab-content" id="adminSubTabContent">
+                        <div class="tab-pane fade show active" id="admin-users-pane" role="tabpanel">
+                            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal(null)">Ajouter un utilisateur</button>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead><tr><th>ID</th><th>Utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>
+                                    <tbody>
+                                        {{ range .Users }}
+                                        <tr>
+                                            <td>{{ .ID }}</td><td>{{ .Username }}</td><td><span class="badge bg-info text-dark">{{ .Role }}</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal({ID: {{.ID}}, Username: '{{.Username}}', Role: '{{.Role}}'})">Modifier</button>
+                                                {{ if ne .Username "admin" }}<button class="btn btn-sm btn-danger" onclick="deleteUser({{ .ID }})">Supprimer</button>{{ end }}
+                                            </td>
+                                        </tr>
+                                        {{ end }}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{ end }}
         </div>
     </div>
 
     <!-- Modals -->
-    <!-- VLAN Modal -->
     <div class="modal fade" id="vlanModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="vlanModalLabel">VLAN</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="vlanForm">
-                        <input type="hidden" id="vlanId">
-                        <div class="mb-3">
-                            <label class="form-label">Subnet (ex: 192.168.1.0/24)</label>
-                            <input type="text" class="form-control" id="vlanSubnet" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nom du VLAN</label>
-                            <input type="text" class="form-control" id="vlanName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Gateway</label>
-                            <input type="text" class="form-control" id="vlanGateway">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Serveurs DNS (séparés par des espaces)</label>
-                            <input type="text" class="form-control" id="vlanDNSServers">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="saveVlan()">Sauvegarder</button>
-                </div>
-            </div>
-        </div>
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="vlanModalLabel">VLAN</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="vlanForm"><input type="hidden" id="vlanId"><div class="mb-3"><label class="form-label">Subnet (ex: 192.168.1.0/24)</label><input type="text" class="form-control" id="vlanSubnet" required></div><div class="mb-3"><label class="form-label">Nom du VLAN</label><input type="text" class="form-control" id="vlanName" required></div><div class="mb-3"><label class="form-label">Gateway</label><input type="text" class="form-control" id="vlanGateway"></div><div class="mb-3"><label class="form-label">Serveurs DNS (séparés par des espaces)</label><input type="text" class="form-control" id="vlanDNSServers"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveVlan()">Sauvegarder</button></div></div></div>
     </div>
 
-    <!-- CI Modal -->
     <div class="modal fade" id="ciModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="ciModalLabel">Configuration Item</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="ciForm">
-                        <input type="hidden" id="ciId">
-                        <div class="mb-3">
-                            <label class="form-label">Hostname</label>
-                            <input type="text" class="form-control" id="ciHostname" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">IP</label>
-                            <input type="text" class="form-control" id="ciIP" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" id="ciDescription" rows="2"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="saveCi()">Sauvegarder</button>
-                </div>
-            </div>
-        </div>
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="ciModalLabel">Configuration Item</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="ciForm"><input type="hidden" id="ciId"><div class="mb-3"><label class="form-label">Hostname</label><input type="text" class="form-control" id="ciHostname" required></div><div class="mb-3"><label class="form-label">IP</label><input type="text" class="form-control" id="ciIP" required></div><div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" id="ciDescription" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveCi()">Sauvegarder</button></div></div></div>
     </div>
 
-    <!-- Flow Edit Modal -->
     <div class="modal fade" id="flowEditModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Mise à jour du flux</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="flowEditForm">
-                        <input type="hidden" id="editFlowId">
-                        <div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div>
-                        <div class="mb-3">
-                            <label class="form-label">Statut</label>
-                            <select class="form-select" id="editStatus">
-                                <option value="demandé">Demandé</option>
-                                <option value="en cours">En cours</option>
-                                <option value="terminé">Terminé</option>
-                                <option value="refusé">Refusé</option>
-                            </select>
-                        </div>
-                        <div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="3"></textarea></div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button>
-                </div>
-            </div>
-        </div>
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Mise à jour du flux</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="flowEditForm"><input type="hidden" id="editFlowId"><div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div><div class="mb-3"><label class="form-label">Statut</label><select class="form-select" id="editStatus"><option value="demandé">Demandé</option><option value="en cours">En cours</option><option value="terminé">Terminé</option><option value="refusé">Refusé</option></select></div><div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="3"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button></div></div></div>
+    </div>
+
+    <div class="modal fade" id="userModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="userModalLabel">Utilisateur</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="userForm"><input type="hidden" id="userId"><div class="mb-3"><label class="form-label">Nom d'utilisateur</label><input type="text" class="form-control" id="userUsername" required></div><div class="mb-3"><label class="form-label">Mot de passe <small class="text-muted">(laisser vide pour ne pas changer)</small></label><input type="password" class="form-control" id="userPassword"></div><div class="mb-3"><label class="form-label">Rôle</label><select class="form-select" id="userRole"><option value="viewer">Viewer (Lecture seule)</option><option value="requestor">Requestor (Formulaire flux)</option><option value="actor">Actor (VLAN/CI/Status)</option><option value="admin">Admin (Tout)</option></select></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveUser()">Sauvegarder</button></div></div></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let rowIndex = 0;
-        // Injecter les VLANs depuis le template Go vers JS
-        const availableVlans = [
-            {{ range .VLANs }}
-            { id: {{.ID}}, name: "{{.VLAN}}", subnet: "{{.Subnet}}" },
-            {{ end }}
-        ];
+        const availableVlans = [ {{ range .VLANs }}{ id: {{.ID}}, name: "{{.VLAN}}", subnet: "{{.Subnet}}" }, {{ end }} ];
 
         function addRow() {
             const tbody = document.getElementById('form-body');
             const idx = rowIndex++;
             const row = document.createElement('tr');
-            row.id = `row-${idx}`;
-            row.className = 'form-row-inputs';
-
-            // Générer les options du select de périmètre
-            let scopeOptions = `
-                <option value="">-- Machine isolée --</option>
-                <option value="EXTERNAL">-- Externe (Hostname) --</option>
-            `;
-            availableVlans.forEach(v => {
-                scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`;
-            });
-
+            row.id = `row-${idx}`; row.className = 'form-row-inputs';
+            let scopeOptions = `<option value="">-- Machine isolée --</option><option value="EXTERNAL">-- Externe (Hostname) --</option>`;
+            availableVlans.forEach(v => { scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`; });
             row.innerHTML = `
                 <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
-                <td>
-                    <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">
-                        ${scopeOptions}
-                    </select>
-                    <input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto">
-                </td>
+                <td><select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">${scopeOptions}</select><input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto"></td>
                 <td><input type="text" name="flows[${idx}].source_ip" class="form-control" id="source_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><input type="text" name="flows[${idx}].source_hostname" class="form-control" id="source_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td>
-                    <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'target')">
-                        ${scopeOptions}
-                    </select>
-                    <input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto">
-                </td>
+                <td><select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'target')">${scopeOptions}</select><input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto"></td>
                 <td><input type="text" name="flows[${idx}].target_ip" class="form-control" id="target_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><input type="text" name="flows[${idx}].target_hostname" class="form-control" id="target_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><select name="flows[${idx}].protocol" class="form-select"><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="BOTH">TCP & UDP</option></select></td>
@@ -469,60 +387,31 @@
                 <td><input type="text" name="flows[${idx}].comment" class="form-control"></td>
             `;
             tbody.appendChild(row);
-            ['source', 'target'].forEach(t => {
-                [`${t}_hostname_${idx}`, `${t}_ip_${idx}`].forEach(id => {
-                    document.getElementById(id).addEventListener('change', e => lookupCI(e.target.value, idx, t));
-                });
-            });
+            ['source', 'target'].forEach(t => { [`${t}_hostname_${idx}`, `${t}_ip_${idx}`].forEach(id => { document.getElementById(id).addEventListener('change', e => lookupCI(e.target.value, idx, t)); }); });
         }
 
         function selectScope(selectEl, idx, type) {
-            const val = selectEl.value;
-            const ipInput = document.getElementById(`${type}_ip_${idx}`);
-            const hostnameInput = document.getElementById(`${type}_hostname_${idx}`);
-            const vlanNameInput = document.getElementById(`${type}_vlan_${idx}`);
-
+            const val = selectEl.value; const ipInput = document.getElementById(`${type}_ip_${idx}`);
+            const hostnameInput = document.getElementById(`${type}_hostname_${idx}`); const vlanNameInput = document.getElementById(`${type}_vlan_${idx}`);
             if (val === "EXTERNAL") {
-                ipInput.value = "";
-                ipInput.disabled = true;
-                ipInput.placeholder = "N/A (Externe)";
-                hostnameInput.disabled = false;
-                hostnameInput.placeholder = "Hostname (ex: machine-externe)";
-                vlanNameInput.value = "EXTERNE";
+                ipInput.value = ""; ipInput.disabled = true; hostnameInput.disabled = false; hostnameInput.placeholder = "Hostname (ex: machine-externe)"; vlanNameInput.value = "EXTERNE";
             } else if (val) {
-                // Mode VLAN
-                ipInput.value = val;
-                ipInput.disabled = false;
-                hostnameInput.value = "";
-                hostnameInput.disabled = true;
-                hostnameInput.placeholder = "Réseau entier";
-                const vlan = availableVlans.find(v => v.subnet === val);
-                if (vlan) vlanNameInput.value = vlan.name;
+                ipInput.value = val; ipInput.disabled = false; hostnameInput.value = ""; hostnameInput.disabled = true;
+                const vlan = availableVlans.find(v => v.subnet === val); if (vlan) vlanNameInput.value = vlan.name;
             } else {
-                // Mode Machine isolée
-                ipInput.disabled = false;
-                hostnameInput.disabled = false;
-                hostnameInput.placeholder = "Hostname";
-                ipInput.placeholder = "IP ou Subnet";
-                vlanNameInput.value = "";
+                ipInput.disabled = false; hostnameInput.disabled = false; hostnameInput.placeholder = "Hostname"; ipInput.placeholder = "IP ou Subnet"; vlanNameInput.value = "";
             }
         }
 
         async function updateSuggestions(query) {
             if (query.length < 2) return;
-            const datalist = document.getElementById('ciSuggestions');
             try {
                 const res = await fetch(`/ci/suggest?query=${encodeURIComponent(query)}`);
                 if (res.ok) {
-                    const cis = await res.json();
-                    datalist.innerHTML = '';
+                    const cis = await res.json(); const dl = document.getElementById('ciSuggestions'); dl.innerHTML = '';
                     cis.forEach(ci => {
-                        const optionHostname = document.createElement('option');
-                        optionHostname.value = ci.hostname;
-                        datalist.appendChild(optionHostname);
-                        const optionIp = document.createElement('option');
-                        optionIp.value = ci.ip;
-                        datalist.appendChild(optionIp);
+                        const oH = document.createElement('option'); oH.value = ci.hostname; dl.appendChild(oH);
+                        const oI = document.createElement('option'); oI.value = ci.ip; dl.appendChild(oI);
                     });
                 }
             } catch (err) { console.error(err); }
@@ -530,154 +419,81 @@
 
         async function lookupCI(q, idx, type) {
             if (!q) return;
-            const h = document.getElementById(`${type}_hostname_${idx}`), 
-                  i = document.getElementById(`${type}_ip_${idx}`), 
-                  v = document.getElementById(`${type}_vlan_${idx}`);
+            const h = document.getElementById(`${type}_hostname_${idx}`), i = document.getElementById(`${type}_ip_${idx}`), v = document.getElementById(`${type}_vlan_${idx}`);
             try {
                 let res = await fetch(`/ci/lookup?query=${encodeURIComponent(q)}`);
                 if (res.ok) {
-                    let ci = await res.json();
-                    if (ci.hostname) h.value = ci.hostname;
-                    if (ci.ip) i.value = ci.ip;
-                    if (ci.vlan && ci.vlan.vlan) {
-                        v.value = ci.vlan.vlan;
-                    } else {
-                        v.value = "";
-                    }
+                    let ci = await res.json(); if (ci.hostname) h.value = ci.hostname; if (ci.ip) i.value = ci.ip;
+                    v.value = ci.vlan?.vlan || "";
                 } else if (q.match(/^(\d{1,3}\.){3}\d{1,3}$/)) {
                     let vres = await fetch(`/vlan/lookup?ip=${encodeURIComponent(q)}`);
-                    if (vres.ok) {
-                        let data = await vres.json();
-                        if (data.vlan?.vlan) v.value = data.vlan.vlan;
-                    }
+                    if (vres.ok) { let data = await vres.json(); if (data.vlan?.vlan) v.value = data.vlan.vlan; }
                 }
             } catch (err) { console.error(err); }
         }
 
-        document.addEventListener('DOMContentLoaded', () => { if(document.getElementById('home-tab').classList.contains('active')) addRow(); });
+        document.addEventListener('DOMContentLoaded', () => { if(document.getElementById('home-tab')?.classList.contains('active')) addRow(); });
 
         function prepareVlanModal(v) {
-            document.getElementById('vlanId').value = v?.ID || '';
-            document.getElementById('vlanSubnet').value = v?.Subnet || '';
-            document.getElementById('vlanName').value = v?.VLAN || '';
-            document.getElementById('vlanGateway').value = v?.Gateway || '';
+            document.getElementById('vlanId').value = v?.ID || ''; document.getElementById('vlanSubnet').value = v?.Subnet || '';
+            document.getElementById('vlanName').value = v?.VLAN || ''; document.getElementById('vlanGateway').value = v?.Gateway || '';
             document.getElementById('vlanDNSServers').value = v?.DNSServers || '';
-            document.getElementById('vlanModalLabel').innerText = v ? 'Modifier le VLAN' : 'Ajouter un VLAN';
         }
-
         async function saveVlan() {
             const id = document.getElementById('vlanId').value;
-            const body = {
-                subnet: document.getElementById('vlanSubnet').value,
-                vlan: document.getElementById('vlanName').value,
-                gateway: document.getElementById('vlanGateway').value,
-                dns_servers: document.getElementById('vlanDNSServers').value
-            };
-            try {
-                const res = await fetch(id ? `/vlan/${id}` : '/vlan', {
-                    method: id ? 'PUT' : 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(body)
-                });
-                if (res.ok) window.location.href = '/?tab=vlan'; else alert('Erreur');
-            } catch (err) { alert(err); }
+            const body = { subnet: document.getElementById('vlanSubnet').value, vlan: document.getElementById('vlanName').value, gateway: document.getElementById('vlanGateway').value, dns_servers: document.getElementById('vlanDNSServers').value };
+            const res = await fetch(id ? `/vlan/${id}` : '/vlan', { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            if (res.ok) window.location.href = '/?tab=vlan'; else alert('Erreur');
         }
-
-        async function deleteVlan(id) {
-            if (confirm('Supprimer ce VLAN ?')) {
-                await fetch(`/vlan/${id}`, {method: 'DELETE'});
-                window.location.href = '/?tab=vlan';
-            }
-        }
-
+        async function deleteVlan(id) { if (confirm('Supprimer ce VLAN ?')) { await fetch(`/vlan/${id}`, {method: 'DELETE'}); window.location.href = '/?tab=vlan'; } }
         async function uploadVlanCSV() {
-            const input = document.getElementById('csvFileInput');
-            if (input.files.length === 0) return;
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            try {
-                const res = await fetch('/vlan/import', {method: 'POST', body: formData});
-                if (res.ok) {
-                    const data = await res.json();
-                    alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`);
-                    window.location.href = '/?tab=vlan';
-                } else alert('Erreur lors de l\'import');
-            } catch (err) { alert(err); }
-            input.value = '';
-        }
-
-        async function uploadCiCSV() {
-            const input = document.getElementById('ciCsvFileInput');
-            if (input.files.length === 0) return;
-            const file = input.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
-            try {
-                const res = await fetch('/ci/import', {method: 'POST', body: formData});
-                if (res.ok) {
-                    const data = await res.json();
-                    alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`);
-                    window.location.href = '/?tab=ci';
-                } else alert('Erreur lors de l\'import');
-            } catch (err) { alert(err); }
-            input.value = '';
+            const input = document.getElementById('csvFileInput'); if (input.files.length === 0) return;
+            const formData = new FormData(); formData.append('file', input.files[0]);
+            const res = await fetch('/vlan/import', {method: 'POST', body: formData});
+            if (res.ok) { const data = await res.json(); alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`); window.location.href = '/?tab=vlan'; } else alert('Erreur');
         }
 
         function prepareCiModal(ci) {
-            document.getElementById('ciId').value = ci?.ID || '';
-            document.getElementById('ciHostname').value = ci?.Hostname || '';
-            document.getElementById('ciIP').value = ci?.IP || '';
-            document.getElementById('ciDescription').value = ci?.Description || '';
-            document.getElementById('ciModalLabel').innerText = ci ? 'Modifier le CI' : 'Ajouter un CI';
+            document.getElementById('ciId').value = ci?.ID || ''; document.getElementById('ciHostname').value = ci?.Hostname || '';
+            document.getElementById('ciIP').value = ci?.IP || ''; document.getElementById('ciDescription').value = ci?.Description || '';
         }
-
         async function saveCi() {
             const id = document.getElementById('ciId').value;
-            const body = {
-                hostname: document.getElementById('ciHostname').value,
-                ip: document.getElementById('ciIP').value,
-                description: document.getElementById('ciDescription').value
-            };
-            try {
-                const res = await fetch(id ? `/ci/${id}` : '/ci', {
-                    method: id ? 'PUT' : 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(body)
-                });
-                if (res.ok) window.location.href = '/?tab=ci'; else { let e = await res.json(); alert(e.error); }
-            } catch (err) { alert(err); }
+            const body = { hostname: document.getElementById('ciHostname').value, ip: document.getElementById('ciIP').value, description: document.getElementById('ciDescription').value };
+            const res = await fetch(id ? `/ci/${id}` : '/ci', { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            if (res.ok) window.location.href = '/?tab=ci'; else { let e = await res.json(); alert(e.error); }
         }
-
-        async function deleteCi(id) {
-            if (confirm('Supprimer ce CI ?')) {
-                await fetch(`/ci/${id}`, {method: 'DELETE'});
-                window.location.href = '/?tab=ci';
-            }
+        async function deleteCi(id) { if (confirm('Supprimer ce CI ?')) { await fetch(`/ci/${id}`, {method: 'DELETE'}); window.location.href = '/?tab=ci'; } }
+        async function uploadCiCSV() {
+            const input = document.getElementById('ciCsvFileInput'); if (input.files.length === 0) return;
+            const formData = new FormData(); formData.append('file', input.files[0]);
+            const res = await fetch('/ci/import', {method: 'POST', body: formData});
+            if (res.ok) { const data = await res.json(); alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`); window.location.href = '/?tab=ci'; } else alert('Erreur');
         }
 
         function prepareFlowEditModal(f) {
-            document.getElementById('editFlowId').value = f.ID;
-            document.getElementById('editRuleNumber').value = f.RuleNumber;
-            document.getElementById('editStatus').value = f.Status;
-            document.getElementById('editComment').value = f.Comment;
+            document.getElementById('editFlowId').value = f.ID; document.getElementById('editRuleNumber').value = f.RuleNumber;
+            document.getElementById('editStatus').value = f.Status; document.getElementById('editComment').value = f.Comment;
         }
-
         async function saveFlowEdit() {
             const id = document.getElementById('editFlowId').value;
-            try {
-                const res = await fetch(`/flow/${id}`, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        rule_number: document.getElementById('editRuleNumber').value,
-                        status: document.getElementById('editStatus').value,
-                        comment: document.getElementById('editComment').value
-                    })
-                });
-                if (res.ok) window.location.reload(); else alert('Erreur');
-            } catch (err) { alert(err); }
+            const res = await fetch(`/flow/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rule_number: document.getElementById('editRuleNumber').value, status: document.getElementById('editStatus').value, comment: document.getElementById('editComment').value }) });
+            if (res.ok) window.location.reload(); else alert('Erreur');
         }
+
+        // User Management
+        function prepareUserModal(u) {
+            document.getElementById('userId').value = u?.ID || ''; document.getElementById('userUsername').value = u?.Username || '';
+            document.getElementById('userPassword').value = ''; document.getElementById('userRole').value = u?.Role || 'viewer';
+            document.getElementById('userModalLabel').innerText = u ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur';
+        }
+        async function saveUser() {
+            const id = document.getElementById('userId').value;
+            const body = { username: document.getElementById('userUsername').value, password: document.getElementById('userPassword').value, role: document.getElementById('userRole').value };
+            const res = await fetch(id ? `/users/${id}` : '/users', { method: id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            if (res.ok) window.location.href = '/?tab=admin'; else alert('Erreur lors de la sauvegarde');
+        }
+        async function deleteUser(id) { if (confirm('Supprimer cet utilisateur ?')) { await fetch(`/users/${id}`, {method: 'DELETE'}); window.location.href = '/?tab=admin'; } }
     </script>
 </body>
 </html>

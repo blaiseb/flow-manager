@@ -16,3 +16,22 @@ database:
     password: "password"
     dbname: "flow_manager"
     sslmode: "disable"
+
+auth:
+  type: "local" # local, proxy, or oidc
+  proxy:
+    header_user: "Auth-User"
+    header_role: "Auth-Groups"
+    role_mappings:
+      "admin_group": "admin"
+      "network_team": "actor"
+  oidc:
+    issuer: "https://auth.example.com"
+    client_id: "flow-manager"
+    client_secret: "votre-secret"
+    redirect_url: "http://localhost:8080/oidc/callback"
+    groups_claim: "groups"
+    role_mappings:
+      "admins": "admin"
+      "it-ops": "actor"
+      "it-users": "requestor"

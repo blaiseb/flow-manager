@@ -42,6 +42,20 @@ type FlowRequest struct {
 	TargetVlan     *VlanSubnet `json:"target_vlan" gorm:"-"`
 }
 
+const (
+	RoleViewer    = "viewer"
+	RoleRequestor = "requestor"
+	RoleActor     = "actor"
+	RoleAdmin     = "admin"
+)
+
+type User struct {
+	gorm.Model
+	Username string `json:"username" gorm:"unique;index"`
+	Password string `json:"-"` // Hashé
+	Role     string `json:"role" gorm:"default:'viewer'"`
+}
+
 func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {
 	if fr.Status == "terminé" {
 		now := time.Now()

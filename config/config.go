@@ -28,6 +28,22 @@ type Config struct {
 			SSLMode  string `yaml:"sslmode"`
 		} `yaml:"postgres"`
 	} `yaml:"database"`
+	Auth struct {
+		Type   string `yaml:"type"` // local, proxy, or oidc
+		Proxy  struct {
+			HeaderUser   string `yaml:"header_user"`
+			HeaderRole   string `yaml:"header_role"`
+			RoleMappings map[string]string `yaml:"role_mappings"`
+		} `yaml:"proxy"`
+		OIDC struct {
+			Issuer       string `yaml:"issuer"`
+			ClientID     string `yaml:"client_id"`
+			ClientSecret string `yaml:"client_secret"`
+			RedirectURL  string `yaml:"redirect_url"`
+			GroupsClaim  string `yaml:"groups_claim"` // Nom du claim pour les groupes, ex: "groups"
+			RoleMappings map[string]string `yaml:"role_mappings"`
+		} `yaml:"oidc"`
+	} `yaml:"auth"`
 }
 
 var Global Config
@@ -38,11 +54,13 @@ func LoadConfig(path string) error {
 	Global.Log.Level = "info"
 	Global.Database.Type = "sqlite"
 	Global.Database.SQLite.File = "flows.db"
+	Global.Auth.Type = "local"
+	Global.Auth.OIDC.GroupsClaim = "groups"
 
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // Use defaults if file doesn't exist
+			return nil
 		}
 		return err
 	}
