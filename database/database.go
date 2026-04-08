@@ -54,30 +54,58 @@ func FindVLAN(db *gorm.DB, ipStr string) (*models.VlanSubnet, error) {
 	return nil, fmt.Errorf("no matching VLAN found")
 }
 
-// MatchVLAN finds the matching VLAN for an IP from a pre-fetched slice of subnets.
-func MatchVLAN(ipStr string, subnets []models.VlanSubnet) *models.VlanSubnet {
+type ParsedSubnet struct {
+	Net    *net.IPNet
+	Source *models.VlanSubnet
+}
+
+// PreParseSubnets parses CIDR strings once to optimize matching.
+func PreParseSubnets(subnets []models.VlanSubnet) []ParsedSubnet {
+	result := make([]ParsedSubnet, 0, len(subnets))
+	for i := range subnets {
+		_, cidrNet, err := net.ParseCIDR(subnets[i].Subnet)
+		if err != nil {
+			logger.Warn("Invalid CIDR format during pre-parsing", "subnet", subnets[i].Subnet, "error", err)
+			continue
+		}
+		result = append(result, ParsedSubnet{
+			Net:    cidrNet,
+			Source: &subnets[i],
+		})
+	}
+	return result
+}
+
+// MatchVLANOptimized uses pre-parsed CIDRs to find a matching VLAN for an IP address.
+func MatchVLANOptimized(ipStr string, parsed []ParsedSubnet) *models.VlanSubnet {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return nil
 	}
 
-	for _, s := range subnets {
-		_, cidrNet, err := net.ParseCIDR(s.Subnet)
-		if err != nil {
-			continue
-		}
-		if cidrNet.Contains(ip) {
-			return &s
+	for _, p := range parsed {
+		if p.Net.Contains(ip) {
+			return p.Source
 		}
 	}
 	return nil
 }
 
 // GetIPsFromSubnet returns all IP addresses in a given CIDR subnet.
+// It limits enumeration to networks smaller than /16 to prevent OOM.
 func GetIPsFromSubnet(cidr string) ([]string, error) {
 	_, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return nil, err
+	}
+
+	ones, bits := ipnet.Mask.Size()
+	// Security limit: refuse to enumerate IPs for large networks (e.g., > /16 for IPv4)
+	if bits == 32 && ones < 16 {
+		return nil, fmt.Errorf("subnet too large to enumerate (%s)", cidr)
+	}
+	if bits == 128 && ones < 112 {
+		return nil, fmt.Errorf("IPv6 subnet too large to enumerate (%s)", cidr)
 	}
 
 	var ips []string

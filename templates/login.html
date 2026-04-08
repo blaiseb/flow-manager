@@ -17,6 +17,7 @@
         <div class="alert alert-danger">{{ .error }}</div>
         {{ end }}
         <form action="/login" method="POST">
+            <input type="hidden" name="_csrf" value="{{ ._csrf }}">
             <div class="mb-3">
                 <label class="form-label">Utilisateur</label>
                 <input type="text" name="username" class="form-control" required autofocus>

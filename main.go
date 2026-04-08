@@ -16,6 +16,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	csrf "github.com/utrack/gin-csrf"
 )
 
 func main() {
@@ -121,6 +122,22 @@ func main() {
 	}
 	store := cookie.NewStore([]byte(sessionSecret))
 	router.Use(sessions.Sessions("flow_session", store))
+
+	// CSRF Protection
+	router.Use(csrf.Middleware(csrf.Options{
+		Secret: sessionSecret,
+		ErrorFunc: func(c *gin.Context) {
+			logger.Warn("CSRF error detected", "ip", c.ClientIP(), "path", c.Request.URL.Path)
+			c.String(400, "CSRF error")
+			c.Abort()
+		},
+	}))
+
+	// Inject CSRF token into template context
+	router.Use(func(c *gin.Context) {
+		c.Set("_csrf", csrf.GetToken(c))
+		c.Next()
+	})
 
 	router.LoadHTMLGlob("templates/*")
 

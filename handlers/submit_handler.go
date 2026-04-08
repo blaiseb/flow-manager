@@ -23,51 +23,36 @@ type FlowSubmission struct {
 	Comment        string `form:"comment"`
 }
 
+type Submission struct {
+	Action string                    `form:"action"`
+	Flows  map[string]FlowSubmission `form:"flows"`
+}
+
+// SubmitHandler handles the submission of flow requests from the web form.
 func (h *Handler) SubmitHandler(c *gin.Context) {
-	if err := c.Request.ParseForm(); err != nil {
-		logger.Error("Failed to parse submission form", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
+	var input Submission
+	if err := c.ShouldBind(&input); err != nil {
+		logger.Error("Failed to bind submission form", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Données de formulaire invalides"})
 		return
 	}
 
-	action := c.PostForm("action") // "generate" or "validate"
-	reference := "REF-" + time.Now().Format("20060102-150405")
-
-	// Group fields by row index
-	rows := make(map[string]*FlowSubmission)
-	for key, values := range c.Request.PostForm {
-		if !strings.HasPrefix(key, "flows[") {
-			continue
-		}
-		idx := key[6:strings.Index(key, "]")]
-		if _, ok := rows[idx]; !ok {
-			rows[idx] = &FlowSubmission{}
-		}
-		val := values[0]
-		field := key[strings.Index(key, "].")+2:]
-		switch field {
-		case "source_hostname":
-			rows[idx].SourceHostname = val
-		case "source_ip":
-			rows[idx].SourceIP = val
-		case "target_hostname":
-			rows[idx].TargetHostname = val
-		case "target_ip":
-			rows[idx].TargetIP = val
-		case "protocol":
-			rows[idx].Protocol = val
-		case "ports":
-			rows[idx].Ports = val
-		case "time_limit":
-			rows[idx].TimeLimit = val
-		case "comment":
-			rows[idx].Comment = val
-		}
+	action := input.Action
+	if action == "" {
+		action = "validate"
 	}
+	reference := "REF-" + time.Now().Format("20060102-150405")
 
 	var flowsToExport []models.FlowRequest
 
-	for _, sub := range rows {
+	// Pre-fetch VLANs once for the whole request
+	var vlans []models.VlanSubnet
+	if err := h.DB.Find(&vlans).Error; err != nil {
+		logger.Error("Failed to fetch VLANs for matching", "error", err)
+	}
+	parsedVlans := database.PreParseSubnets(vlans)
+
+	for _, sub := range input.Flows {
 		ports := parsePorts(sub.Ports)
 		if len(ports) == 0 {
 			ports = []int{0}
@@ -106,6 +91,10 @@ func (h *Handler) SubmitHandler(c *gin.Context) {
 			flow.SourceHostname = sub.SourceHostname
 			flow.TargetHostname = sub.TargetHostname
 
+			// Resolve VLANs for export
+			flow.SourceVlan = database.MatchVLANOptimized(flow.SourceIP, parsedVlans)
+			flow.TargetVlan = database.MatchVLANOptimized(flow.TargetIP, parsedVlans)
+
 			flowsToExport = append(flowsToExport, flow)
 		}
 
@@ -123,7 +112,7 @@ func (h *Handler) SubmitHandler(c *gin.Context) {
 		// Use batch insert for performance
 		if err := h.DB.CreateInBatches(flowsToExport, 100).Error; err != nil {
 			logger.Error("Failed to create flow requests in batch", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save flow requests"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Échec de l'enregistrement des flux"})
 			return
 		}
 	}

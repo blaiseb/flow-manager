@@ -42,6 +42,9 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 		logger.Error("Failed to fetch CIs", "error", err)
 	}
 
+	// Optimized VLAN matching using pre-parsed CIDRs
+	parsedVlans := database.PreParseSubnets(vlans)
+
 	// Fetch users only if admin
 	if currentUser.Role == models.RoleAdmin {
 		if err := h.DB.Find(&users).Error; err != nil {
@@ -50,7 +53,7 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 	}
 
 	for i := range cis {
-		cis[i].Vlan = database.MatchVLAN(cis[i].IP, vlans)
+		cis[i].Vlan = database.MatchVLANOptimized(cis[i].IP, parsedVlans)
 	}
 	
 	h.DB.Model(&models.FlowRequest{}).Distinct().Pluck("reference", &references)
@@ -83,12 +86,12 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 		if flows[i].SourceCI != nil {
 			flows[i].SourceHostname = flows[i].SourceCI.Hostname
 		}
-		flows[i].SourceVlan = database.MatchVLAN(flows[i].SourceIP, vlans)
+		flows[i].SourceVlan = database.MatchVLANOptimized(flows[i].SourceIP, parsedVlans)
 
 		if flows[i].TargetCI != nil {
 			flows[i].TargetHostname = flows[i].TargetCI.Hostname
 		}
-		flows[i].TargetVlan = database.MatchVLAN(flows[i].TargetIP, vlans)
+		flows[i].TargetVlan = database.MatchVLANOptimized(flows[i].TargetIP, parsedVlans)
 	}
 
 	var selectedVlan *models.VlanSubnet
