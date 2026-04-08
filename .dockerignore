@@ -1,0 +1,12 @@
+flow-manager
+flow-manager.exe
+*.log
+flows.db*
+.git
+.vscode
+.idea
+config.yaml
+Dockerfile
+.dockerignore
+tmp/
+.gemini/

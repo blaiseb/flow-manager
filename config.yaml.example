@@ -8,7 +8,7 @@ log:
 database:
   type: "sqlite" # sqlite or postgres
   sqlite:
-    file: "flows.db"
+    file: "data/flows.db" # Pour Docker, utilisez "data/flows.db" pour la persistence
   postgres:
     host: "localhost"
     port: 5432

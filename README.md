@@ -31,22 +31,29 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
 - **Interface** : HTML5, Bootstrap 5.3, JavaScript (Vanilla)
 - **Excel** : [Excelize](https://github.com/xuri/excelize)
 
-## 📦 Installation
+## 📦 Installation & Déploiement
 
-1. Assurez-vous d'avoir Go installé (version 1.20+ recommandée).
-2. Clonez le dépôt :
-   ```bash
-   git clone <votre-repo-url>
-   cd flow-manager
-   ```
-3. Installez les dépendances :
+### Installation Locale
+1. Assurez-vous d'avoir Go installé (version 1.21+ recommandée).
+2. Clonez le dépôt et installez les dépendances :
    ```bash
    go mod tidy
    ```
-4. Compilez le projet :
+3. Compilez et lancez :
    ```bash
    go build -o flow-manager main.go
+   ./flow-manager
    ```
+
+### Déploiement Docker (Recommandé)
+L'application est prête à être conteneurisée.
+
+1. Préparez votre fichier `config.yaml` à partir de l'exemple.
+2. Lancez avec Docker Compose :
+   ```bash
+   docker-compose up -d
+   ```
+   *Note : Les données (`flows.db`) sont persistées dans le dossier `./data` de votre hôte.*
 
 ## 🚦 Utilisation
 
