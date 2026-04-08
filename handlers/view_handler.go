@@ -22,10 +22,14 @@ func ViewHandler(c *gin.Context) {
 	var flows []models.FlowRequest
 	var vlans []models.VlanSubnet
 	var cis []models.CI
+	var references []string
 	activeTab := c.DefaultQuery("tab", "home")
 
 	database.DB.Find(&vlans)
 	database.DB.Find(&cis)
+	
+	// Get unique references for the filter dropdown
+	database.DB.Model(&models.FlowRequest{}).Distinct().Pluck("reference", &references)
 
 	// Map CIs for fast lookup
 	ciMap := make(map[string]models.CI)
@@ -42,13 +46,13 @@ func ViewHandler(c *gin.Context) {
 		var matchingIPs []string
 		database.DB.Model(&models.CI{}).Where("fqdn LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Pluck("ip", &matchingIPs)
 
-		// 2. Build the query: match by direct IP, by comment, OR by any IP found in step 1
+		// 2. Build the query including reference field
 		if len(matchingIPs) > 0 {
-			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR source_ip IN ? OR target_ip IN ?", 
-				searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs)
+			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ? OR source_ip IN ? OR target_ip IN ?", 
+				searchTerm, searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs)
 		} else {
-			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ?", 
-				searchTerm, searchTerm, searchTerm)
+			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ?", 
+				searchTerm, searchTerm, searchTerm, searchTerm)
 		}
 	}
 
@@ -97,6 +101,7 @@ func ViewHandler(c *gin.Context) {
 		"Flows":        flows,
 		"VLANs":        vlans,
 		"CIs":          cis,
+		"References":   references,
 		"SearchQuery":  searchQuery,
 		"ActiveTab":    activeTab,
 		"SelectedVlan": selectedVlan,

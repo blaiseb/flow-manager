@@ -41,6 +41,11 @@
         <div class="tab-content" id="myTabContent">
             <!-- Datalist globale pour les suggestions -->
             <datalist id="ciSuggestions"></datalist>
+            <datalist id="refSuggestions">
+                {{ range .References }}
+                <option value="{{ . }}">
+                {{ end }}
+            </datalist>
             <!-- Onglet 1: Formulaire de demande -->
             <div class="tab-pane fade {{ if eq .ActiveTab "home" }}show active{{ end }}" id="home-tab-pane" role="tabpanel">
                 <div class="mt-3">
@@ -77,8 +82,11 @@
                     <form action="/" method="GET">
                         <div class="input-group mb-3">
                             <input type="hidden" name="tab" value="view">
-                            <input type="text" class="form-control" placeholder="Rechercher par FQDN ou IP..." name="search" value="{{ .SearchQuery }}">
-                            <button class="btn btn-outline-secondary" type="submit">Rechercher</button>
+                            <input type="text" class="form-control" placeholder="Rechercher par FQDN, IP ou Référence..." name="search" value="{{ .SearchQuery }}" list="refSuggestions">
+                            <button class="btn btn-outline-secondary" type="submit">Rechercher / Filtrer</button>
+                            {{ if .SearchQuery }}
+                            <a href="/?tab=view" class="btn btn-outline-danger">Effacer le filtre</a>
+                            {{ end }}
                         </div>
                     </form>
                     <hr>
@@ -105,14 +113,24 @@
                                 {{ range .Flows }}
                                 <tr>
                                     <td>{{ .ID }}</td>
-                                    <td><small><code>{{ .Reference }}</code></small></td>
+                                    <td><a href="/?tab=view&search={{ .Reference }}"><small><code>{{ .Reference }}</code></small></a></td>
                                     <td>
-                                        {{ if .SourceFQDN }}{{ .SourceFQDN }}{{ else }}Subnet/IP{{ end }}<br>
-                                        <small class="text-muted">{{ .SourceIP }} ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                        {{ if .SourceFQDN }}
+                                            <a href="/?tab=view&search={{ .SourceFQDN }}">{{ .SourceFQDN }}</a>
+                                        {{ else }}
+                                            <span class="text-muted">Subnet/IP</span>
+                                        {{ end }}
+                                        <br>
+                                        <small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                     </td>
                                     <td>
-                                        {{ if .TargetFQDN }}{{ .TargetFQDN }}{{ else }}Subnet/IP{{ end }}<br>
-                                        <small class="text-muted">{{ .TargetIP }} ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                        {{ if .TargetFQDN }}
+                                            <a href="/?tab=view&search={{ .TargetFQDN }}">{{ .TargetFQDN }}</a>
+                                        {{ else }}
+                                            <span class="text-muted">Subnet/IP</span>
+                                        {{ end }}
+                                        <br>
+                                        <small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                     </td>
                                     <td>{{ .Protocol }}</td>
 
