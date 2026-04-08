@@ -15,7 +15,7 @@ import (
 
 // ImportCIs handles bulk import of CIs from a CSV file (comma-delimited).
 // Identifies columns by reading the header line.
-func ImportCIs(c *gin.Context) {
+func (h *Handler) ImportCIs(c *gin.Context) {
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
 		logger.Warn("No file uploaded for CI import")
@@ -92,21 +92,27 @@ func ImportCIs(c *gin.Context) {
 		}
 
 		var existing models.CI
-		err = database.DB.Unscoped().Where("ip = ?", ip).First(&existing).Error
+		err = h.DB.Unscoped().Where("ip = ?", ip).First(&existing).Error
 		if err == nil {
 			existing.DeletedAt = gorm.DeletedAt{}
 			existing.Hostname = hostname
 			existing.Description = description
-			database.DB.Unscoped().Save(&existing)
-			updated++
+			if err := h.DB.Unscoped().Save(&existing).Error; err != nil {
+				logger.Error("Failed to update CI during import", "ip", ip, "error", err)
+			} else {
+				updated++
+			}
 		} else {
 			newCi := models.CI{
 				Hostname:    hostname,
 				IP:          ip,
 				Description: description,
 			}
-			database.DB.Create(&newCi)
-			created++
+			if err := h.DB.Create(&newCi).Error; err != nil {
+				logger.Error("Failed to create CI during import", "ip", ip, "error", err)
+			} else {
+				created++
+			}
 		}
 	}
 
@@ -116,13 +122,17 @@ func ImportCIs(c *gin.Context) {
 
 // ExportCIs exports all CIs to a comma-delimited CSV file.
 // Order: IP, Hostname, Description, VLAN
-func ExportCIs(c *gin.Context) {
+func (h *Handler) ExportCIs(c *gin.Context) {
 	var cis []models.CI
 	var vlans []models.VlanSubnet
-	database.DB.Find(&vlans)
-	database.DB.Find(&cis)
-
-	logger.Info("Exporting CIs", "count", len(cis))
+	if err := h.DB.Find(&vlans).Error; err != nil {
+		logger.Error("Failed to fetch VLANs for CI export", "error", err)
+	}
+	if err := h.DB.Find(&cis).Error; err != nil {
+		logger.Error("Failed to fetch CIs for export", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch CIs"})
+		return
+	}
 
 	c.Header("Content-Type", "text/csv")
 	c.Header("Content-Disposition", "attachment;filename=cis_export.csv")
@@ -148,7 +158,7 @@ func ExportCIs(c *gin.Context) {
 }
 
 // CreateCI handles the creation of a new CI.
-func CreateCI(c *gin.Context) {
+func (h *Handler) CreateCI(c *gin.Context) {
 	var input struct {
 		Hostname    string `json:"hostname"`
 		IP          string `json:"ip"`
@@ -168,13 +178,13 @@ func CreateCI(c *gin.Context) {
 	logger.Info("Creating/Restoring CI", "ip", input.IP, "hostname", input.Hostname)
 
 	var ci models.CI
-	err := database.DB.Unscoped().Where("ip = ?", input.IP).First(&ci).Error
+	err := h.DB.Unscoped().Where("ip = ?", input.IP).First(&ci).Error
 
 	if err == nil {
 		ci.DeletedAt = gorm.DeletedAt{}
 		ci.Hostname = input.Hostname
 		ci.Description = input.Description
-		if err := database.DB.Unscoped().Save(&ci).Error; err != nil {
+		if err := h.DB.Unscoped().Save(&ci).Error; err != nil {
 			logger.Error("Failed to restore CI", "ip", input.IP, "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore CI: " + err.Error()})
 			return
@@ -189,7 +199,7 @@ func CreateCI(c *gin.Context) {
 		Description: input.Description,
 	}
 
-	if err := database.DB.Create(&ci).Error; err != nil {
+	if err := h.DB.Create(&ci).Error; err != nil {
 		logger.Error("Failed to create CI", "ip", input.IP, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create CI: " + err.Error()})
 		return
@@ -199,10 +209,10 @@ func CreateCI(c *gin.Context) {
 }
 
 // UpdateCI handles the update of an existing CI.
-func UpdateCI(c *gin.Context) {
+func (h *Handler) UpdateCI(c *gin.Context) {
 	id := c.Param("id")
 	var ci models.CI
-	if err := database.DB.First(&ci, id).Error; err != nil {
+	if err := h.DB.First(&ci, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "CI not found"})
 		return
 	}
@@ -223,7 +233,7 @@ func UpdateCI(c *gin.Context) {
 	ci.IP = input.IP
 	ci.Description = input.Description
 
-	if err := database.DB.Save(&ci).Error; err != nil {
+	if err := h.DB.Save(&ci).Error; err != nil {
 		logger.Error("Failed to update CI", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update CI: " + err.Error()})
 		return
@@ -233,16 +243,16 @@ func UpdateCI(c *gin.Context) {
 }
 
 // DeleteCI handles the deletion of a CI.
-func DeleteCI(c *gin.Context) {
+func (h *Handler) DeleteCI(c *gin.Context) {
 	id := c.Param("id")
 	logger.Info("Deleting CI", "id", id)
 	var ci models.CI
-	if err := database.DB.First(&ci, id).Error; err != nil {
+	if err := h.DB.First(&ci, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "CI not found"})
 		return
 	}
 
-	if err := database.DB.Delete(&ci).Error; err != nil {
+	if err := h.DB.Delete(&ci).Error; err != nil {
 		logger.Error("Failed to delete CI", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete CI"})
 		return

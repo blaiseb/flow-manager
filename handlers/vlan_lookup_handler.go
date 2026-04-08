@@ -9,7 +9,7 @@ import (
 )
 
 // VlanLookupHandler handles the lookup of a VLAN by IP address.
-func VlanLookupHandler(c *gin.Context) {
+func (h *Handler) VlanLookupHandler(c *gin.Context) {
 	ipQuery := c.Query("ip")
 	if ipQuery == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "IP address is required"})
@@ -18,7 +18,7 @@ func VlanLookupHandler(c *gin.Context) {
 
 	logger.Debug("VLAN Lookup", "ip", ipQuery)
 
-	vlan, err := database.FindVLAN(ipQuery)
+	vlan, err := database.FindVLAN(h.DB, ipQuery)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

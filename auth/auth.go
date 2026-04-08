@@ -2,7 +2,6 @@ package auth
 
 import (
 	"flow-manager/config"
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"net/http"
@@ -11,20 +10,21 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // AuthRequired checks if user is authenticated and has required role.
-func AuthRequired(minRole string) gin.HandlerFunc {
+func AuthRequired(db *gorm.DB, minRole string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var user models.User
 		var authenticated bool
 
 		if config.Global.Auth.Type == "proxy" {
 			// Mode SSO via Reverse Proxy
-			authenticated, user = handleProxyAuth(c)
+			authenticated, user = handleProxyAuth(db, c)
 		} else {
 			// Mode Local via Session
-			authenticated, user = handleLocalAuth(c)
+			authenticated, user = handleLocalAuth(db, c)
 		}
 
 		if !authenticated {
@@ -50,7 +50,7 @@ func AuthRequired(minRole string) gin.HandlerFunc {
 	}
 }
 
-func handleLocalAuth(c *gin.Context) (bool, models.User) {
+func handleLocalAuth(db *gorm.DB, c *gin.Context) (bool, models.User) {
 	session := sessions.Default(c)
 	userID := session.Get("user_id")
 	if userID == nil {
@@ -58,13 +58,13 @@ func handleLocalAuth(c *gin.Context) (bool, models.User) {
 	}
 
 	var user models.User
-	if err := database.DB.First(&user, userID).Error; err != nil {
+	if err := db.First(&user, userID).Error; err != nil {
 		return false, models.User{}
 	}
 	return true, user
 }
 
-func handleProxyAuth(c *gin.Context) (bool, models.User) {
+func handleProxyAuth(db *gorm.DB, c *gin.Context) (bool, models.User) {
 	headerUser := config.Global.Auth.Proxy.HeaderUser
 	username := c.GetHeader(headerUser)
 	if username == "" {
@@ -73,7 +73,7 @@ func handleProxyAuth(c *gin.Context) (bool, models.User) {
 
 	// Fetch or Create user dynamically
 	var user models.User
-	err := database.DB.Where("username = ?", username).First(&user).Error
+	err := db.Where("username = ?", username).First(&user).Error
 	
 	// Determine role from headers if provided
 	role := models.RoleViewer
@@ -90,12 +90,12 @@ func handleProxyAuth(c *gin.Context) (bool, models.User) {
 			Role:     role,
 			Password: "SSO_EXTERNAL_USER", // Dummy password
 		}
-		database.DB.Create(&user)
+		db.Create(&user)
 		logger.Info("New SSO user created", "username", username, "role", role)
 	} else if user.Role != role && role != models.RoleViewer {
 		// Update role if changed in SSO
 		user.Role = role
-		database.DB.Save(&user)
+		db.Save(&user)
 		logger.Debug("SSO user role updated", "username", username, "new_role", role)
 	}
 

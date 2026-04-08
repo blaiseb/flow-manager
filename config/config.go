@@ -8,7 +8,8 @@ import (
 
 type Config struct {
 	Server struct {
-		Port int `yaml:"port"`
+		Port   int    `yaml:"port"`
+		Secret string `yaml:"secret"`
 	} `yaml:"server"`
 	Log struct {
 		Level string `yaml:"level"` // debug, info, warn, error
@@ -69,6 +70,10 @@ func LoadConfig(path string) error {
 	decoder := yaml.NewDecoder(file)
 	if err := decoder.Decode(&Global); err != nil {
 		return err
+	}
+
+	if secret := os.Getenv("FLOW_SESSION_SECRET"); secret != "" {
+		Global.Server.Secret = secret
 	}
 
 	return nil

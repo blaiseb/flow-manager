@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"fmt"
@@ -24,7 +23,7 @@ type FlowSubmission struct {
 	Comment        string `form:"comment"`
 }
 
-func SubmitHandler(c *gin.Context) {
+func (h *Handler) SubmitHandler(c *gin.Context) {
 	if err := c.Request.ParseForm(); err != nil {
 		logger.Error("Failed to parse submission form", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
@@ -103,12 +102,6 @@ func SubmitHandler(c *gin.Context) {
 				Status:    "demandé",
 			}
 
-			if action == "validate" {
-				if err := database.DB.Create(&flow).Error; err != nil {
-					logger.Error("Failed to create flow request", "error", err)
-				}
-			}
-
 			// We need Hostnames for the Excel generation (even if not saved)
 			flow.SourceHostname = sub.SourceHostname
 			flow.TargetHostname = sub.TargetHostname
@@ -118,17 +111,26 @@ func SubmitHandler(c *gin.Context) {
 
 		if action == "validate" {
 			if sub.SourceHostname != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
-				ensureCI(sub.SourceHostname, sub.SourceIP)
+				h.ensureCI(sub.SourceHostname, sub.SourceIP)
 			}
 			if sub.TargetHostname != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
-				ensureCI(sub.TargetHostname, sub.TargetIP)
+				h.ensureCI(sub.TargetHostname, sub.TargetIP)
 			}
+		}
+	}
+
+	if action == "validate" && len(flowsToExport) > 0 {
+		// Use batch insert for performance
+		if err := h.DB.CreateInBatches(flowsToExport, 100).Error; err != nil {
+			logger.Error("Failed to create flow requests in batch", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save flow requests"})
+			return
 		}
 	}
 
 	if action == "generate" {
 		logger.Info("Generating Excel request (preview)", "count", len(flowsToExport))
-		f, err := GenerateExcelFile(flowsToExport)
+		f, err := h.GenerateExcelFile(flowsToExport)
 		if err == nil {
 			fileName := fmt.Sprintf("demande_draft_%s.xlsx", reference)
 			c.Header("Content-Type", "application/octet-stream")
@@ -142,7 +144,7 @@ func SubmitHandler(c *gin.Context) {
 
 	if action == "markdown" {
 		logger.Info("Generating Markdown request (preview)", "count", len(flowsToExport))
-		md := GenerateMarkdown(flowsToExport)
+		md := h.GenerateMarkdown(flowsToExport)
 		c.JSON(http.StatusOK, gin.H{"markdown": md})
 		return
 	}
@@ -152,7 +154,7 @@ func SubmitHandler(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/?tab=view")
 }
 
-func GenerateMarkdown(flows []models.FlowRequest) string {
+func (h *Handler) GenerateMarkdown(flows []models.FlowRequest) string {
 	var sb strings.Builder
 	sb.WriteString("bonjour, \nPouvez-vous réaliser les ouvertures de flux suivantes, \n\n")
 	sb.WriteString("| Source | Destination | Protocole | Port | Commentaire |\n")
@@ -198,14 +200,24 @@ func parsePorts(s string) []int {
 	var result []int
 	parts := strings.Split(s, ",")
 	for _, p := range parts {
+		if len(result) >= 100 {
+			break
+		}
 		p = strings.TrimSpace(p)
 		if strings.Contains(p, "-") {
 			rangeParts := strings.Split(p, "-")
 			if len(rangeParts) == 2 {
-				start, _ := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
-				end, _ := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
-				for i := start; i <= end; i++ {
-					result = append(result, i)
+				start, err1 := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+				end, err2 := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+				if err1 == nil && err2 == nil {
+					for i := start; i <= end; i++ {
+						if len(result) >= 100 {
+							break
+						}
+						result = append(result, i)
+					}
+				} else {
+					logger.Warn("Invalid port range", "range", p)
 				}
 			}
 		} else {
@@ -218,15 +230,15 @@ func parsePorts(s string) []int {
 	return result
 }
 
-func ensureCI(hostname, ip string) {
+func (h *Handler) ensureCI(hostname, ip string) {
 	var ci models.CI
-	err := database.DB.Where("ip = ?", ip).First(&ci).Error
+	err := h.DB.Where("ip = ?", ip).First(&ci).Error
 	if err != nil {
 		logger.Debug("Auto-creating CI", "hostname", hostname, "ip", ip)
-		database.DB.Create(&models.CI{Hostname: hostname, IP: ip})
+		h.DB.Create(&models.CI{Hostname: hostname, IP: ip})
 	} else if ci.Hostname == "" && hostname != "" {
 		logger.Debug("Updating existing CI Hostname", "ip", ip, "new_hostname", hostname)
 		ci.Hostname = hostname
-		database.DB.Save(&ci)
+		h.DB.Save(&ci)
 	}
 }

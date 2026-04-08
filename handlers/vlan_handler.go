@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/csv"
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"io"
@@ -13,7 +12,7 @@ import (
 )
 
 // ImportVlans handles bulk import of VLANs from a CSV file (comma-delimited).
-func ImportVlans(c *gin.Context) {
+func (h *Handler) ImportVlans(c *gin.Context) {
 	file, _, err := c.Request.FormFile("file")
 	if err != nil {
 		logger.Warn("No file uploaded for VLAN import")
@@ -57,15 +56,15 @@ func ImportVlans(c *gin.Context) {
 		}
 
 		var existing models.VlanSubnet
-		err = database.DB.Where("subnet = ?", vlanData.Subnet).First(&existing).Error
+		err = h.DB.Where("subnet = ?", vlanData.Subnet).First(&existing).Error
 		if err == nil {
 			existing.VLAN = vlanData.VLAN
 			existing.Gateway = vlanData.Gateway
 			existing.DNSServers = vlanData.DNSServers
-			database.DB.Save(&existing)
+			h.DB.Save(&existing)
 			updated++
 		} else {
-			database.DB.Create(&vlanData)
+			h.DB.Create(&vlanData)
 			created++
 		}
 	}
@@ -80,9 +79,9 @@ func ImportVlans(c *gin.Context) {
 }
 
 // ExportVlans exports all VLANs to a comma-delimited CSV file.
-func ExportVlans(c *gin.Context) {
+func (h *Handler) ExportVlans(c *gin.Context) {
 	var vlans []models.VlanSubnet
-	if err := database.DB.Find(&vlans).Error; err != nil {
+	if err := h.DB.Find(&vlans).Error; err != nil {
 		logger.Error("Failed to fetch VLANs for export", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch VLANs"})
 		return
@@ -111,7 +110,7 @@ func ExportVlans(c *gin.Context) {
 }
 
 // CreateVlan handles the creation of a new VLAN.
-func CreateVlan(c *gin.Context) {
+func (h *Handler) CreateVlan(c *gin.Context) {
 	var vlan models.VlanSubnet
 	if err := c.ShouldBindJSON(&vlan); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -120,7 +119,7 @@ func CreateVlan(c *gin.Context) {
 
 	logger.Info("Creating VLAN", "vlan", vlan.VLAN, "subnet", vlan.Subnet)
 
-	if err := database.DB.Create(&vlan).Error; err != nil {
+	if err := h.DB.Create(&vlan).Error; err != nil {
 		logger.Error("Failed to create VLAN", "vlan", vlan.VLAN, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create VLAN"})
 		return
@@ -130,10 +129,10 @@ func CreateVlan(c *gin.Context) {
 }
 
 // UpdateVlan handles the update of an existing VLAN.
-func UpdateVlan(c *gin.Context) {
+func (h *Handler) UpdateVlan(c *gin.Context) {
 	id := c.Param("id")
 	var vlan models.VlanSubnet
-	if err := database.DB.First(&vlan, id).Error; err != nil {
+	if err := h.DB.First(&vlan, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "VLAN not found"})
 		return
 	}
@@ -151,7 +150,7 @@ func UpdateVlan(c *gin.Context) {
 	vlan.Gateway = updatedVlan.Gateway
 	vlan.DNSServers = updatedVlan.DNSServers
 
-	if err := database.DB.Save(&vlan).Error; err != nil {
+	if err := h.DB.Save(&vlan).Error; err != nil {
 		logger.Error("Failed to update VLAN", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update VLAN"})
 		return
@@ -161,16 +160,16 @@ func UpdateVlan(c *gin.Context) {
 }
 
 // DeleteVlan handles the deletion of a VLAN.
-func DeleteVlan(c *gin.Context) {
+func (h *Handler) DeleteVlan(c *gin.Context) {
 	id := c.Param("id")
 	logger.Info("Deleting VLAN", "id", id)
 	var vlan models.VlanSubnet
-	if err := database.DB.First(&vlan, id).Error; err != nil {
+	if err := h.DB.First(&vlan, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "VLAN not found"})
 		return
 	}
 
-	if err := database.DB.Delete(&vlan).Error; err != nil {
+	if err := h.DB.Delete(&vlan).Error; err != nil {
 		logger.Error("Failed to delete VLAN", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete VLAN"})
 		return

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"flow-manager/config"
@@ -12,10 +13,8 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
 // FindVLAN finds the corresponding VlanSubnet model for an IP address in the database.
-func FindVLAN(ipStr string) (*models.VlanSubnet, error) {
+func FindVLAN(db *gorm.DB, ipStr string) (*models.VlanSubnet, error) {
 	if ipStr == "" {
 		return nil, nil
 	}
@@ -25,8 +24,19 @@ func FindVLAN(ipStr string) (*models.VlanSubnet, error) {
 		return nil, fmt.Errorf("invalid IP address format: %s", ipStr)
 	}
 
+	// Optimization for PostgreSQL: use the CIDR operator >>= (contained in or equals)
+	if config.Global.Database.Type == "postgres" {
+		var vlan models.VlanSubnet
+		if err := db.Where("subnet >>= ?", ipStr).First(&vlan).Error; err == nil {
+			return &vlan, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	// Fallback for SQLite or if not found in Postgres (though >>= should work)
 	var subnets []models.VlanSubnet
-	if err := DB.Find(&subnets).Error; err != nil {
+	if err := db.Find(&subnets).Error; err != nil {
 		return nil, err
 	}
 
@@ -97,7 +107,7 @@ func inc(ip net.IP) {
 }
 
 // InitDatabase initialise la connexion à la base de données et migre les schémas.
-func InitDatabase() {
+func InitDatabase() *gorm.DB {
 	var err error
 	var dialector gorm.Dialector
 
@@ -121,20 +131,20 @@ func InitDatabase() {
 		dbLogLevel = gormlogger.Error
 	}
 
-	DB, err = gorm.Open(dialector, &gorm.Config{
+	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: gormlogger.Default.LogMode(dbLogLevel),
 	})
 	if err != nil {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
-	err = DB.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{})
+	err = db.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{})
 	if err != nil {
 		logger.Fatal("Failed to migrate database", "error", err)
 	}
 
 	var count int64
-	DB.Model(&models.VlanSubnet{}).Count(&count)
+	db.Model(&models.VlanSubnet{}).Count(&count)
 	if count == 0 {
 		logger.Info("Seeding VlanSubnet table with initial data...")
 		vlans := []models.VlanSubnet{
@@ -143,10 +153,11 @@ func InitDatabase() {
 			{Subnet: "172.16.0.0/12", VLAN: "VLAN_GUEST"},
 			{Subnet: "::1/128", VLAN: "VLAN_LOCALHOST"},
 		}
-		if err := DB.Create(&vlans).Error; err != nil {
+		if err := db.Create(&vlans).Error; err != nil {
 			logger.Fatal("Failed to seed VlanSubnet table", "error", err)
 		}
 	}
 
 	logger.Info("Database connection successful and schemas migrated.")
+	return db
 }

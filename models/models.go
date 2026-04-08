@@ -35,6 +35,10 @@ type FlowRequest struct {
 	ImplementedAt *time.Time `json:"implemented_at"`
 	Status        string     `json:"status" gorm:"default:'demandé'"`
 
+	// Associations SQL
+	SourceCI *CI `json:"-" gorm:"foreignKey:SourceIP;references:IP"`
+	TargetCI *CI `json:"-" gorm:"foreignKey:TargetIP;references:IP"`
+
 	// Champs d'affichage dynamique (non stockés)
 	SourceHostname string      `json:"source_hostname" gorm:"-"`
 	SourceVlan     *VlanSubnet `json:"source_vlan" gorm:"-"`

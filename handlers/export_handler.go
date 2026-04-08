@@ -13,11 +13,15 @@ import (
 )
 
 // GenerateExcelFile produces an excelize.File from a slice of FlowRequests with merged headers.
-func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
+func (h *Handler) GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 	var vlans []models.VlanSubnet
 	var cis []models.CI
-	database.DB.Find(&vlans)
-	database.DB.Find(&cis)
+	if err := h.DB.Find(&vlans).Error; err != nil {
+		logger.Error("Failed to fetch VLANs for export", "error", err)
+	}
+	if err := h.DB.Find(&cis).Error; err != nil {
+		logger.Error("Failed to fetch CIs for export", "error", err)
+	}
 
 	ciMap := make(map[string]models.CI)
 	for _, ci := range cis {
@@ -26,7 +30,10 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 
 	f := excelize.NewFile()
 	sheet := "Flux"
-	index, _ := f.NewSheet(sheet)
+	index, err := f.NewSheet(sheet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new sheet: %w", err)
+	}
 	f.SetActiveSheet(index)
 
 	// Row 1: Merged Headers
@@ -67,12 +74,16 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 	f.SetCellValue(sheet, "H2", "Hostname")
 
 	// Styles for headers
-	style, _ := f.NewStyle(&excelize.Style{
+	style, err := f.NewStyle(&excelize.Style{
 		Fill: excelize.Fill{Type: "pattern", Color: []string{"#E0E0E0"}, Pattern: 1},
 		Font: &excelize.Font{Bold: true},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
 	})
-	f.SetCellStyle(sheet, "A1", "P2", style)
+	if err != nil {
+		logger.Error("Failed to create style for export", "error", err)
+	} else {
+		f.SetCellStyle(sheet, "A1", "P2", style)
+	}
 
 	for i, flow := range flows {
 		row := i + 3 // Data starts at row 3
@@ -136,12 +147,12 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 }
 
 // ExportHandler generates an Excel file of all flow requests.
-func ExportHandler(c *gin.Context) {
+func (h *Handler) ExportHandler(c *gin.Context) {
 	logger.Info("Generating complete flows export")
 	var flows []models.FlowRequest
-	database.DB.Order("created_at desc").Find(&flows)
+	h.DB.Order("created_at desc").Find(&flows)
 
-	f, err := GenerateExcelFile(flows)
+	f, err := h.GenerateExcelFile(flows)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate Excel file"})
 		return

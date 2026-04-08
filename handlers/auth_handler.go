@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"flow-manager/auth"
 	"flow-manager/config"
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"net/http"
@@ -21,35 +22,18 @@ var (
 	oidcVerifier *oidc.IDTokenVerifier
 )
 
-// InitOIDC initializes the OIDC provider and configuration.
-func InitOIDC() {
-	if config.Global.Auth.Type != "oidc" {
-		return
+func generateState() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		logger.Fatal("Failed to generate secure random state", "error", err)
 	}
-
-	ctx := context.Background()
-	provider, err := oidc.NewProvider(ctx, config.Global.Auth.OIDC.Issuer)
-	if err != nil {
-		logger.Fatal("Failed to get OIDC provider", "error", err)
-	}
-
-	oidcProvider = provider
-	oidcConfig = oauth2.Config{
-		ClientID:     config.Global.Auth.OIDC.ClientID,
-		ClientSecret: config.Global.Auth.OIDC.ClientSecret,
-		Endpoint:     provider.Endpoint(),
-		RedirectURL:  config.Global.Auth.OIDC.RedirectURL,
-		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-	}
-
-	oidcVerifier = provider.Verifier(&oidc.Config{ClientID: config.Global.Auth.OIDC.ClientID})
-	logger.Info("OIDC initialized", "issuer", config.Global.Auth.OIDC.Issuer)
+	return hex.EncodeToString(b)
 }
 
 // ShowLogin displays the login page or redirects to OIDC.
-func ShowLogin(c *gin.Context) {
+func (h *Handler) ShowLogin(c *gin.Context) {
 	if config.Global.Auth.Type == "oidc" {
-		state := "somestate" // In production, generate a random state and store it in session
+		state := generateState()
 		session := sessions.Default(c)
 		session.Set("oidc_state", state)
 		session.Save()
@@ -60,7 +44,7 @@ func ShowLogin(c *gin.Context) {
 }
 
 // OIDCCallback handles the callback from the OIDC provider.
-func OIDCCallback(c *gin.Context) {
+func (h *Handler) OIDCCallback(c *gin.Context) {
 	session := sessions.Default(c)
 	state := session.Get("oidc_state")
 	if state == nil || c.Query("state") != state.(string) {
@@ -111,21 +95,28 @@ func OIDCCallback(c *gin.Context) {
 
 	// Fetch or Create user
 	var user models.User
-	err = database.DB.Where("username = ?", username).First(&user).Error
+	err = h.DB.Where("username = ?", username).First(&user).Error
 	if err != nil {
 		user = models.User{
 			Username: username,
 			Role:     role,
 			Password: "OIDC_EXTERNAL_USER",
 		}
-		database.DB.Create(&user)
+		if err := h.DB.Create(&user).Error; err != nil {
+			logger.Error("Failed to create OIDC user", "username", username, "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			return
+		}
 		logger.Info("New OIDC user created", "username", username, "role", role)
 	} else {
 		// Update role if changed
 		if user.Role != role && role != models.RoleViewer {
 			user.Role = role
-			database.DB.Save(&user)
-			logger.Debug("OIDC user role updated", "username", username, "new_role", role)
+			if err := h.DB.Save(&user).Error; err != nil {
+				logger.Error("Failed to update OIDC user role", "username", username, "error", err)
+			} else {
+				logger.Debug("OIDC user role updated", "username", username, "new_role", role)
+			}
 		}
 	}
 
@@ -137,7 +128,7 @@ func OIDCCallback(c *gin.Context) {
 }
 
 // Login handles the local login request.
-func Login(c *gin.Context) {
+func (h *Handler) Login(c *gin.Context) {
 	if config.Global.Auth.Type == "oidc" {
 		c.Redirect(http.StatusFound, "/login")
 		return
@@ -146,7 +137,7 @@ func Login(c *gin.Context) {
 	password := c.PostForm("password")
 
 	var user models.User
-	if err := database.DB.Where("username = ?", username).First(&user).Error; err != nil {
+	if err := h.DB.Where("username = ?", username).First(&user).Error; err != nil {
 		logger.Warn("Login failed: user not found", "username", username)
 		c.HTML(http.StatusUnauthorized, "login.html", gin.H{"error": "Utilisateur ou mot de passe incorrect"})
 		return
@@ -167,7 +158,7 @@ func Login(c *gin.Context) {
 }
 
 // Logout handles the logout request.
-func Logout(c *gin.Context) {
+func (h *Handler) Logout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Clear()
 	session.Save()
@@ -180,7 +171,7 @@ func Logout(c *gin.Context) {
 }
 
 // CreateUser handles the creation of a new user.
-func CreateUser(c *gin.Context) {
+func (h *Handler) CreateUser(c *gin.Context) {
 	var input struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -191,14 +182,19 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	hashed, _ := auth.HashPassword(input.Password)
+	hashed, err := auth.HashPassword(input.Password)
+	if err != nil {
+		logger.Error("Failed to hash password", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
 	user := models.User{
 		Username: input.Username,
 		Password: hashed,
 		Role:     input.Role,
 	}
 
-	if err := database.DB.Create(&user).Error; err != nil {
+	if err := h.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
@@ -207,10 +203,10 @@ func CreateUser(c *gin.Context) {
 }
 
 // UpdateUser handles user updates.
-func UpdateUser(c *gin.Context) {
+func (h *Handler) UpdateUser(c *gin.Context) {
 	id := c.Param("id")
 	var user models.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := h.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -228,11 +224,16 @@ func UpdateUser(c *gin.Context) {
 	user.Username = input.Username
 	user.Role = input.Role
 	if input.Password != "" {
-		hashed, _ := auth.HashPassword(input.Password)
+		hashed, err := auth.HashPassword(input.Password)
+		if err != nil {
+			logger.Error("Failed to hash updated password", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
 		user.Password = hashed
 	}
 
-	if err := database.DB.Save(&user).Error; err != nil {
+	if err := h.DB.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
 		return
 	}
@@ -241,9 +242,9 @@ func UpdateUser(c *gin.Context) {
 }
 
 // DeleteUser handles user deletion.
-func DeleteUser(c *gin.Context) {
+func (h *Handler) DeleteUser(c *gin.Context) {
 	id := c.Param("id")
-	if err := database.DB.Delete(&models.User{}, id).Error; err != nil {
+	if err := h.DB.Delete(&models.User{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
