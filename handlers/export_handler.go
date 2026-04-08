@@ -12,7 +12,7 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// GenerateExcelFile produces an excelize.File from a slice of FlowRequests.
+// GenerateExcelFile produces an excelize.File from a slice of FlowRequests with merged headers.
 func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 	var vlans []models.VlanSubnet
 	var cis []models.CI
@@ -29,17 +29,53 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 	index, _ := f.NewSheet(sheet)
 	f.SetActiveSheet(index)
 
-	headers := []string{
-		"ID", "Référence", "Source FQDN", "Source IP", "Source VLAN", "Cible FQDN", "Cible IP", "Cible VLAN",
-		"Protocole", "Port", "Statut", "Rule #", "Date Action", "Limite Temporelle", "Commentaire", "Date Création",
-	}
-	for i, header := range headers {
-		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		f.SetCellValue(sheet, cell, header)
-	}
+	// Row 1: Merged Headers
+	f.SetCellValue(sheet, "A1", "ID")
+	f.MergeCell(sheet, "A1", "A2")
+	f.SetCellValue(sheet, "B1", "Référence")
+	f.MergeCell(sheet, "B1", "B2")
+	
+	f.SetCellValue(sheet, "C1", "SOURCE")
+	f.MergeCell(sheet, "C1", "E1")
+	
+	f.SetCellValue(sheet, "F1", "CIBLE (TARGET)")
+	f.MergeCell(sheet, "F1", "H1")
+	
+	f.SetCellValue(sheet, "I1", "Protocole")
+	f.MergeCell(sheet, "I1", "I2")
+	f.SetCellValue(sheet, "J1", "Port")
+	f.MergeCell(sheet, "J1", "J2")
+	f.SetCellValue(sheet, "K1", "Statut")
+	f.MergeCell(sheet, "K1", "K2")
+	f.SetCellValue(sheet, "L1", "Rule #")
+	f.MergeCell(sheet, "L1", "L2")
+	f.SetCellValue(sheet, "M1", "Date Action")
+	f.MergeCell(sheet, "M1", "M2")
+	f.SetCellValue(sheet, "N1", "Limite Temporelle")
+	f.MergeCell(sheet, "N1", "N2")
+	f.SetCellValue(sheet, "O1", "Commentaire")
+	f.MergeCell(sheet, "O1", "O2")
+	f.SetCellValue(sheet, "P1", "Date Création")
+	f.MergeCell(sheet, "P1", "P2")
+
+	// Row 2: Sub-headers
+	f.SetCellValue(sheet, "C2", "VLAN")
+	f.SetCellValue(sheet, "D2", "IP / Subnet")
+	f.SetCellValue(sheet, "E2", "Hostname")
+	f.SetCellValue(sheet, "F2", "VLAN")
+	f.SetCellValue(sheet, "G2", "IP / Subnet")
+	f.SetCellValue(sheet, "H2", "Hostname")
+
+	// Styles for headers
+	style, _ := f.NewStyle(&excelize.Style{
+		Fill: excelize.Fill{Type: "pattern", Color: []string{"#E0E0E0"}, Pattern: 1},
+		Font: &excelize.Font{Bold: true},
+		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"},
+	})
+	f.SetCellStyle(sheet, "A1", "P2", style)
 
 	for i, flow := range flows {
-		row := i + 2
+		row := i + 3 // Data starts at row 3
 		
 		timeLimit := "Sans limite"
 		if flow.TimeLimit != nil {
@@ -51,18 +87,22 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 			actionDate = flow.ImplementedAt.Format("2006-01-02")
 		}
 
-		srcFQDN := "-"
-		if ci, ok := ciMap[flow.SourceIP]; ok {
-			srcFQDN = ci.FQDN
+		srcHostname := "-"
+		if flow.SourceHostname != "" {
+			srcHostname = flow.SourceHostname
+		} else if ci, ok := ciMap[flow.SourceIP]; ok {
+			srcHostname = ci.Hostname
 		}
 		srcVlanName := "Inconnu"
 		if v := database.MatchVLAN(flow.SourceIP, vlans); v != nil {
 			srcVlanName = v.VLAN
 		}
 
-		tgtFQDN := "-"
-		if ci, ok := ciMap[flow.TargetIP]; ok {
-			tgtFQDN = ci.FQDN
+		tgtHostname := "-"
+		if flow.TargetHostname != "" {
+			tgtHostname = flow.TargetHostname
+		} else if ci, ok := ciMap[flow.TargetIP]; ok {
+			tgtHostname = ci.Hostname
 		}
 		tgtVlanName := "Inconnu"
 		if v := database.MatchVLAN(flow.TargetIP, vlans); v != nil {
@@ -71,12 +111,17 @@ func GenerateExcelFile(flows []models.FlowRequest) (*excelize.File, error) {
 
 		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), flow.ID)
 		f.SetCellValue(sheet, fmt.Sprintf("B%d", row), flow.Reference)
-		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), srcFQDN)
+		
+		// Source
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", row), srcVlanName)
 		f.SetCellValue(sheet, fmt.Sprintf("D%d", row), flow.SourceIP)
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", row), srcVlanName)
-		f.SetCellValue(sheet, fmt.Sprintf("F%d", row), tgtFQDN)
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", row), srcHostname)
+		
+		// Target
+		f.SetCellValue(sheet, fmt.Sprintf("F%d", row), tgtVlanName)
 		f.SetCellValue(sheet, fmt.Sprintf("G%d", row), flow.TargetIP)
-		f.SetCellValue(sheet, fmt.Sprintf("H%d", row), tgtVlanName)
+		f.SetCellValue(sheet, fmt.Sprintf("H%d", row), tgtHostname)
+		
 		f.SetCellValue(sheet, fmt.Sprintf("I%d", row), flow.Protocol)
 		f.SetCellValue(sheet, fmt.Sprintf("J%d", row), flow.Port)
 		f.SetCellValue(sheet, fmt.Sprintf("K%d", row), flow.Status)

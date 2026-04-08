@@ -5,9 +5,9 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
 ## 🚀 Fonctionnalités Clés
 
 - **Architecture IP-Centric** : Les flux sont stockés par IP ou Subnet (CIDR), permettant de gérer aussi bien des machines isolées que des VLANs entiers.
-- **Résolution Dynamique** : Les noms de machines (FQDN) et les noms de VLANs sont résolus en temps réel à l'affichage à partir des référentiels.
+- **Résolution Dynamique** : Les noms de machines (Hostname) et les noms de VLANs sont résolus en temps réel à l'affichage à partir des référentiels.
 - **Référentiel VLAN avancé** :
-    - Import/Export CSV (format espace : `subnet name gateway dns`).
+    - Import/Export CSV (format : `subnet,name,gateway,dns`).
     - Vue détaillée par VLAN avec liste exhaustive de toutes les adresses IP du subnet.
     - Détection automatique de la Gateway et des serveurs DNS.
 - **Gestion des CI (Configuration Items)** :
@@ -18,8 +18,9 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
     - **Génération automatique d'un fichier Excel** dès la validation de la demande.
     - Support des plages de ports (ex: `80, 443, 8080-8090`).
 - **Consultation & Recherche** :
-    - Recherche multicritère : par FQDN (via résolution inverse), par IP, par Subnet ou par commentaire.
+    - Recherche multicritère : par Hostname (via résolution inverse), par IP, par Subnet ou par commentaire.
     - Export complet de la base au format Excel.
+
 
 ## 🛠️ Stack Technique
 
@@ -53,10 +54,9 @@ Un gestionnaire de demandes de flux réseau intelligent, conçu pour simplifier 
    ```bash
    ./flow-manager
    ```
-   *Optionnel* : Pour activer le mode debug (logs détaillés, SQL GORM, mode développement Gin) :
-   ```bash
-   ./flow-manager --debug
-   ```
+   *Optionnel* :
+   - Pour changer le port (8080 par défaut) : `./flow-manager -port 9090`
+   - Pour activer le mode debug : `./flow-manager --debug`
 2. Accédez à l'interface via votre navigateur : `http://localhost:8080`
 3. **Initialisation** : Commencez par importer vos VLANs via l'onglet "VLANs > Importer CSV" pour activer la résolution dynamique.
 

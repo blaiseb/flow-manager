@@ -1,0 +1,18 @@
+server:
+  port: 8080
+
+log:
+  level: "info" # debug, info, warn, error
+  debug: false  # true activates GORM SQL logs and Gin debug mode
+
+database:
+  type: "sqlite" # sqlite or postgres
+  sqlite:
+    file: "flows.db"
+  postgres:
+    host: "localhost"
+    port: 5432
+    user: "postgres"
+    password: "password"
+    dbname: "flow_manager"
+    sslmode: "disable"

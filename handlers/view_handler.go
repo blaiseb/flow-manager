@@ -12,7 +12,7 @@ import (
 
 type IPInfo struct {
 	IP          string
-	FQDN        string
+	Hostname    string
 	Description string
 	HasCI       bool
 }
@@ -39,6 +39,7 @@ func ViewHandler(c *gin.Context) {
 	
 	database.DB.Model(&models.FlowRequest{}).Distinct().Pluck("reference", &references)
 
+	// Map CIs for fast lookup
 	ciMap := make(map[string]models.CI)
 	for _, ci := range cis {
 		ciMap[ci.IP] = ci
@@ -50,9 +51,11 @@ func ViewHandler(c *gin.Context) {
 		searchTerm := "%" + searchQuery + "%"
 		logger.Debug("Filtering flows", "query", searchQuery)
 		
+		// 1. Find IPs of CIs matching the Hostname
 		var matchingIPs []string
-		database.DB.Model(&models.CI{}).Where("fqdn LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Pluck("ip", &matchingIPs)
+		database.DB.Model(&models.CI{}).Where("hostname LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Pluck("ip", &matchingIPs)
 
+		// 2. Build the query including reference field
 		if len(matchingIPs) > 0 {
 			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ? OR source_ip IN ? OR target_ip IN ?", 
 				searchTerm, searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs)
@@ -64,18 +67,20 @@ func ViewHandler(c *gin.Context) {
 
 	db.Order("created_at desc").Find(&flows)
 
+	// Dynamically populate display fields for flows
 	for i := range flows {
 		if ci, ok := ciMap[flows[i].SourceIP]; ok {
-			flows[i].SourceFQDN = ci.FQDN
+			flows[i].SourceHostname = ci.Hostname
 		}
 		flows[i].SourceVlan = database.MatchVLAN(flows[i].SourceIP, vlans)
 
 		if ci, ok := ciMap[flows[i].TargetIP]; ok {
-			flows[i].TargetFQDN = ci.FQDN
+			flows[i].TargetHostname = ci.Hostname
 		}
 		flows[i].TargetVlan = database.MatchVLAN(flows[i].TargetIP, vlans)
 	}
 
+	// VLAN Detail Logic
 	var selectedVlan *models.VlanSubnet
 	var vlanIPs []IPInfo
 	vlanIDParam := c.Query("vlan_id")
@@ -93,7 +98,7 @@ func ViewHandler(c *gin.Context) {
 			for _, ipStr := range ips {
 				info := IPInfo{IP: ipStr}
 				if ci, ok := ciMap[ipStr]; ok {
-					info.FQDN = ci.FQDN
+					info.Hostname = ci.Hostname
 					info.Description = ci.Description
 					info.HasCI = true
 				}

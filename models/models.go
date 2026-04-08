@@ -10,14 +10,14 @@ import (
 // CI represents a Configuration Item.
 type CI struct {
 	gorm.Model
-	FQDN        string      `json:"fqdn" gorm:"index"`
+	Hostname    string      `json:"hostname" gorm:"index"`
 	IP          string      `json:"ip" gorm:"unique;index"`
 	Description string      `json:"description"`
 	Vlan        *VlanSubnet `json:"vlan" gorm:"-"`
 }
 
 func (ci *CI) BeforeSave(tx *gorm.DB) (err error) {
-	ci.FQDN = strings.ToLower(ci.FQDN)
+	ci.Hostname = strings.ToLower(ci.Hostname)
 	return
 }
 
@@ -30,16 +30,16 @@ type FlowRequest struct {
 	Port          int        `json:"port" gorm:"index"`
 	TimeLimit     *time.Time `json:"time_limit"`
 	Comment       string     `json:"comment"`
-	Reference     string     `json:"reference" gorm:"index"` // Nouveau champ de regroupement
+	Reference     string     `json:"reference" gorm:"index"`
 	RuleNumber    string     `json:"rule_number"`
 	ImplementedAt *time.Time `json:"implemented_at"`
 	Status        string     `json:"status" gorm:"default:'demandé'"`
 
 	// Champs d'affichage dynamique (non stockés)
-	SourceFQDN string      `json:"source_fqdn" gorm:"-"`
-	SourceVlan *VlanSubnet `json:"source_vlan" gorm:"-"`
-	TargetFQDN string      `json:"target_fqdn" gorm:"-"`
-	TargetVlan *VlanSubnet `json:"target_vlan" gorm:"-"`
+	SourceHostname string      `json:"source_hostname" gorm:"-"`
+	SourceVlan     *VlanSubnet `json:"source_vlan" gorm:"-"`
+	TargetHostname string      `json:"target_hostname" gorm:"-"`
+	TargetVlan     *VlanSubnet `json:"target_vlan" gorm:"-"`
 }
 
 func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {

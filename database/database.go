@@ -3,9 +3,11 @@ package database
 import (
 	"fmt"
 	"net"
+	"flow-manager/config"
 	"flow-manager/models"
 	"flow-manager/logger"
 	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
@@ -15,7 +17,7 @@ var DB *gorm.DB
 // FindVLAN finds the corresponding VlanSubnet model for an IP address in the database.
 func FindVLAN(ipStr string) (*models.VlanSubnet, error) {
 	if ipStr == "" {
-		return nil, nil // No IP, no VLAN.
+		return nil, nil
 	}
 
 	ip := net.ParseIP(ipStr)
@@ -69,7 +71,6 @@ func GetIPsFromSubnet(cidr string) ([]string, error) {
 	}
 
 	var ips []string
-	// start at the network address
 	ip := make(net.IP, len(ipnet.IP))
 	copy(ip, ipnet.IP)
 
@@ -78,7 +79,6 @@ func GetIPsFromSubnet(cidr string) ([]string, error) {
 		inc(ip)
 	}
 
-	// remove network and broadcast addresses for IPv4 if it's at least a /30
 	ones, bits := ipnet.Mask.Size()
 	if bits == 32 && ones <= 30 && len(ips) >= 4 {
 		return ips[1 : len(ips)-1], nil
@@ -99,29 +99,40 @@ func inc(ip net.IP) {
 // InitDatabase initialise la connexion à la base de données et migre les schémas.
 func InitDatabase() {
 	var err error
+	var dialector gorm.Dialector
+
+	cfg := config.Global.Database
+
+	if cfg.Type == "postgres" {
+		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
+			cfg.Postgres.Host, cfg.Postgres.User, cfg.Postgres.Password, 
+			cfg.Postgres.DBName, cfg.Postgres.Port, cfg.Postgres.SSLMode)
+		dialector = postgres.Open(dsn)
+		logger.Info("Connecting to PostgreSQL database", "host", cfg.Postgres.Host, "dbname", cfg.Postgres.DBName)
+	} else {
+		dialector = sqlite.Open(cfg.SQLite.File)
+		logger.Info("Connecting to SQLite database", "file", cfg.SQLite.File)
+	}
 	
-	// Determine database log level based on DebugMode
 	dbLogLevel := gormlogger.Silent
-	if logger.DebugMode {
+	if config.Global.Log.Debug {
 		dbLogLevel = gormlogger.Info
 	} else {
 		dbLogLevel = gormlogger.Error
 	}
 
-	DB, err = gorm.Open(sqlite.Open("flows.db"), &gorm.Config{
-		Logger: gormlogger.Default.LogMode(dbLogLevel), // Logging SQL selon mode
+	DB, err = gorm.Open(dialector, &gorm.Config{
+		Logger: gormlogger.Default.LogMode(dbLogLevel),
 	})
 	if err != nil {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
-	// Migration automatique des modèles pour créer/mettre à jour les tables.
 	err = DB.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{})
 	if err != nil {
 		logger.Fatal("Failed to migrate database", "error", err)
 	}
 
-	// Insérer des données de test pour les VLANs si la table est vide.
 	var count int64
 	DB.Model(&models.VlanSubnet{}).Count(&count)
 	if count == 0 {

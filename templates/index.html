@@ -54,17 +54,21 @@
                             <table class="table table-bordered align-middle">
                                 <thead class="form-row-header">
                                     <tr>
-                                        <th>VLAN Source</th>
-                                        <th>IP Source</th>
-                                        <th>FQDN Source</th>
-                                        <th>VLAN Target</th>
-                                        <th>IP Target</th>
-                                        <th>FQDN Cible</th>
-                                        <th>Protocole</th>
-                                        <th>Port(s)</th>
-                                        <th>Limite Temporelle</th>
-                                        <th>Commentaire</th>
-                                        <th>Action</th>
+                                        <th rowspan="2">Action</th>
+                                        <th colspan="3" class="bg-light">SOURCE</th>
+                                        <th colspan="3" class="bg-light">CIBLE (TARGET)</th>
+                                        <th rowspan="2">Protocole</th>
+                                        <th rowspan="2">Port(s)</th>
+                                        <th rowspan="2">Limite Temporelle</th>
+                                        <th rowspan="2">Commentaire</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-light">VLAN</th>
+                                        <th class="bg-light">IP / Subnet</th>
+                                        <th class="bg-light">Hostname</th>
+                                        <th class="bg-light">VLAN</th>
+                                        <th class="bg-light">IP / Subnet</th>
+                                        <th class="bg-light">Hostname</th>
                                     </tr>
                                 </thead>
                                 <tbody id="form-body"></tbody>
@@ -86,7 +90,7 @@
                     <form action="/" method="GET">
                         <div class="input-group mb-3">
                             <input type="hidden" name="tab" value="view">
-                            <input type="text" class="form-control" placeholder="Rechercher par FQDN, IP ou Référence..." name="search" value="{{ .SearchQuery }}" list="refSuggestions">
+                            <input type="text" class="form-control" placeholder="Rechercher par Hostname, IP ou Référence..." name="search" value="{{ .SearchQuery }}" list="refSuggestions">
                             <button class="btn btn-outline-secondary" type="submit">Rechercher / Filtrer</button>
                             {{ if .SearchQuery }}
                             <a href="/?tab=view" class="btn btn-outline-danger">Effacer le filtre</a>
@@ -119,8 +123,8 @@
                                     <td>{{ .ID }}</td>
                                     <td><a href="/?tab=view&search={{ .Reference }}"><small><code>{{ .Reference }}</code></small></a></td>
                                     <td>
-                                        {{ if .SourceFQDN }}
-                                            <a href="/?tab=view&search={{ .SourceFQDN }}">{{ .SourceFQDN }}</a>
+                                        {{ if .SourceHostname }}
+                                            <a href="/?tab=view&search={{ .SourceHostname }}">{{ .SourceHostname }}</a>
                                             <br><small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .SourceIP }}">{{ .SourceIP }}</a>
@@ -128,8 +132,8 @@
                                         {{ end }}
                                     </td>
                                     <td>
-                                        {{ if .TargetFQDN }}
-                                            <a href="/?tab=view&search={{ .TargetFQDN }}">{{ .TargetFQDN }}</a>
+                                        {{ if .TargetHostname }}
+                                            <a href="/?tab=view&search={{ .TargetHostname }}">{{ .TargetHostname }}</a>
                                             <br><small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .TargetIP }}">{{ .TargetIP }}</a>
@@ -153,7 +157,7 @@
                                     </td>
                                 </tr>
                                 {{ else }}
-                                <tr><td colspan="11" class="text-center">Aucun flux à afficher.</td></tr>
+                                <tr><td colspan="12" class="text-center">Aucun flux à afficher.</td></tr>
                                 {{ end }}
                             </tbody>
                         </table>
@@ -242,7 +246,7 @@
                                     <thead>
                                         <tr>
                                             <th>IP</th>
-                                            <th>FQDN</th>
+                                            <th>Hostname</th>
                                             <th>Description</th>
                                             <th>Historique</th>
                                         </tr>
@@ -251,7 +255,7 @@
                                         {{ range .VlanIPs }}
                                         <tr>
                                             <td><code>{{ .IP }}</code></td>
-                                            <td>{{ if .HasCI }}{{ .FQDN }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
+                                            <td>{{ if .HasCI }}{{ .Hostname }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
                                             <td>{{ if .HasCI }}{{ .Description }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
                                             <td>
                                                 <a href="/?tab=view&search={{ .IP }}" class="btn btn-sm btn-link p-0">Voir flux</a>
@@ -271,16 +275,21 @@
             <div class="tab-pane fade {{ if eq .ActiveTab "ci" }}show active{{ end }}" id="ci-tab-pane" role="tabpanel">
                 <div class="mt-3">
                     <h4>Référentiel des Configuration Items (CI)</h4>
-                    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal(null)">Ajouter un CI</button>
+                    <div class="mb-3">
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal(null)">Ajouter un CI</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('ciCsvFileInput').click()">Importer CSV</button>
+                        <a href="/ci/export" class="btn btn-outline-secondary">Exporter CSV</a>
+                        <input type="file" id="ciCsvFileInput" style="display: none" accept=".csv,.txt" onchange="uploadCiCSV()">
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>FQDN</th>
                                     <th>IP</th>
-                                    <th>VLAN</th>
+                                    <th>Hostname</th>
                                     <th>Description</th>
+                                    <th>VLAN</th>
                                     <th>Dernière Mise à jour</th>
                                     <th>Actions</th>
                                 </tr>
@@ -289,13 +298,13 @@
                                 {{ range .CIs }}
                                 <tr>
                                     <td>{{ .ID }}</td>
-                                    <td>{{ .FQDN }}</td>
                                     <td>{{ .IP }}</td>
-                                    <td>{{ if .Vlan }}{{ .Vlan.VLAN }}{{ else }}Non défini{{ end }}</td>
+                                    <td>{{ .Hostname }}</td>
                                     <td>{{ .Description }}</td>
+                                    <td>{{ if .Vlan }}{{ .Vlan.VLAN }}{{ else }}Non défini{{ end }}</td>
                                     <td>{{ .UpdatedAt.Format "02/01/2006 15:04" }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal({ID: {{.ID}}, FQDN: '{{.FQDN}}', IP: '{{.IP}}', Description: '{{.Description}}'})">Modifier</button>
+                                        <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal({ID: {{.ID}}, Hostname: '{{.Hostname}}', IP: '{{.IP}}', Description: '{{.Description}}'})">Modifier</button>
                                         <button class="btn btn-sm btn-danger" onclick="deleteCi({{ .ID }})">Supprimer</button>
                                     </td>
                                 </tr>
@@ -335,7 +344,7 @@
                             <input type="text" class="form-control" id="vlanGateway">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Serveurs DNS (séparés par des virgules)</label>
+                            <label class="form-label">Serveurs DNS (séparés par des espaces)</label>
                             <input type="text" class="form-control" id="vlanDNSServers">
                         </div>
                     </form>
@@ -359,8 +368,8 @@
                     <form id="ciForm">
                         <input type="hidden" id="ciId">
                         <div class="mb-3">
-                            <label class="form-label">FQDN</label>
-                            <input type="text" class="form-control" id="ciFQDN" required>
+                            <label class="form-label">Hostname</label>
+                            <input type="text" class="form-control" id="ciHostname" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">IP</label>
@@ -430,13 +439,14 @@
             // Générer les options du select de périmètre
             let scopeOptions = `
                 <option value="">-- Machine isolée --</option>
-                <option value="EXTERNAL">-- Externe (FQDN) --</option>
+                <option value="EXTERNAL">-- Externe (Hostname) --</option>
             `;
             availableVlans.forEach(v => {
                 scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`;
             });
 
             row.innerHTML = `
+                <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
                 <td>
                     <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">
                         ${scopeOptions}
@@ -444,7 +454,7 @@
                     <input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto">
                 </td>
                 <td><input type="text" name="flows[${idx}].source_ip" class="form-control" id="source_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].source_fqdn" class="form-control" id="source_fqdn_${idx}" placeholder="FQDN" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
+                <td><input type="text" name="flows[${idx}].source_hostname" class="form-control" id="source_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td>
                     <select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'target')">
                         ${scopeOptions}
@@ -452,16 +462,15 @@
                     <input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto">
                 </td>
                 <td><input type="text" name="flows[${idx}].target_ip" class="form-control" id="target_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-                <td><input type="text" name="flows[${idx}].target_fqdn" class="form-control" id="target_fqdn_${idx}" placeholder="FQDN" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
+                <td><input type="text" name="flows[${idx}].target_hostname" class="form-control" id="target_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
                 <td><select name="flows[${idx}].protocol" class="form-select"><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="BOTH">TCP & UDP</option></select></td>
                 <td><input type="text" name="flows[${idx}].ports" class="form-control" placeholder="80, 443"></td>
                 <td><input type="date" name="flows[${idx}].time_limit" class="form-control"></td>
                 <td><input type="text" name="flows[${idx}].comment" class="form-control"></td>
-                <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
             `;
             tbody.appendChild(row);
             ['source', 'target'].forEach(t => {
-                [`${t}_fqdn_${idx}`, `${t}_ip_${idx}`].forEach(id => {
+                [`${t}_hostname_${idx}`, `${t}_ip_${idx}`].forEach(id => {
                     document.getElementById(id).addEventListener('change', e => lookupCI(e.target.value, idx, t));
                 });
             });
@@ -470,30 +479,30 @@
         function selectScope(selectEl, idx, type) {
             const val = selectEl.value;
             const ipInput = document.getElementById(`${type}_ip_${idx}`);
-            const fqdnInput = document.getElementById(`${type}_fqdn_${idx}`);
+            const hostnameInput = document.getElementById(`${type}_hostname_${idx}`);
             const vlanNameInput = document.getElementById(`${type}_vlan_${idx}`);
 
             if (val === "EXTERNAL") {
                 ipInput.value = "";
                 ipInput.disabled = true;
                 ipInput.placeholder = "N/A (Externe)";
-                fqdnInput.disabled = false;
-                fqdnInput.placeholder = "Domaine / FQDN (ex: google.com)";
+                hostnameInput.disabled = false;
+                hostnameInput.placeholder = "Hostname (ex: machine-externe)";
                 vlanNameInput.value = "EXTERNE";
             } else if (val) {
                 // Mode VLAN
                 ipInput.value = val;
                 ipInput.disabled = false;
-                fqdnInput.value = "";
-                fqdnInput.disabled = true;
-                fqdnInput.placeholder = "Réseau entier";
+                hostnameInput.value = "";
+                hostnameInput.disabled = true;
+                hostnameInput.placeholder = "Réseau entier";
                 const vlan = availableVlans.find(v => v.subnet === val);
                 if (vlan) vlanNameInput.value = vlan.name;
             } else {
                 // Mode Machine isolée
                 ipInput.disabled = false;
-                fqdnInput.disabled = false;
-                fqdnInput.placeholder = "FQDN";
+                hostnameInput.disabled = false;
+                hostnameInput.placeholder = "Hostname";
                 ipInput.placeholder = "IP ou Subnet";
                 vlanNameInput.value = "";
             }
@@ -508,9 +517,9 @@
                     const cis = await res.json();
                     datalist.innerHTML = '';
                     cis.forEach(ci => {
-                        const optionFqdn = document.createElement('option');
-                        optionFqdn.value = ci.fqdn;
-                        datalist.appendChild(optionFqdn);
+                        const optionHostname = document.createElement('option');
+                        optionHostname.value = ci.hostname;
+                        datalist.appendChild(optionHostname);
                         const optionIp = document.createElement('option');
                         optionIp.value = ci.ip;
                         datalist.appendChild(optionIp);
@@ -521,23 +530,21 @@
 
         async function lookupCI(q, idx, type) {
             if (!q) return;
-            const f = document.getElementById(`${type}_fqdn_${idx}`), 
+            const h = document.getElementById(`${type}_hostname_${idx}`), 
                   i = document.getElementById(`${type}_ip_${idx}`), 
                   v = document.getElementById(`${type}_vlan_${idx}`);
             try {
                 let res = await fetch(`/ci/lookup?query=${encodeURIComponent(q)}`);
                 if (res.ok) {
                     let ci = await res.json();
-                    if (ci.fqdn) f.value = ci.fqdn;
+                    if (ci.hostname) h.value = ci.hostname;
                     if (ci.ip) i.value = ci.ip;
-                    // Notez qu'en JSON Go, VlanSubnet.VLAN devient vlan.vlan
                     if (ci.vlan && ci.vlan.vlan) {
                         v.value = ci.vlan.vlan;
                     } else {
-                        v.value = ""; // Vlan non trouvé ou non défini
+                        v.value = "";
                     }
                 } else if (q.match(/^(\d{1,3}\.){3}\d{1,3}$/)) {
-                    // Si le CI n'existe pas mais que c'est une IP, on cherche au moins le VLAN
                     let vres = await fetch(`/vlan/lookup?ip=${encodeURIComponent(q)}`);
                     if (vres.ok) {
                         let data = await vres.json();
@@ -597,12 +604,29 @@
                     window.location.href = '/?tab=vlan';
                 } else alert('Erreur lors de l\'import');
             } catch (err) { alert(err); }
-            input.value = ''; // Reset input
+            input.value = '';
+        }
+
+        async function uploadCiCSV() {
+            const input = document.getElementById('ciCsvFileInput');
+            if (input.files.length === 0) return;
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch('/ci/import', {method: 'POST', body: formData});
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`);
+                    window.location.href = '/?tab=ci';
+                } else alert('Erreur lors de l\'import');
+            } catch (err) { alert(err); }
+            input.value = '';
         }
 
         function prepareCiModal(ci) {
             document.getElementById('ciId').value = ci?.ID || '';
-            document.getElementById('ciFQDN').value = ci?.FQDN || '';
+            document.getElementById('ciHostname').value = ci?.Hostname || '';
             document.getElementById('ciIP').value = ci?.IP || '';
             document.getElementById('ciDescription').value = ci?.Description || '';
             document.getElementById('ciModalLabel').innerText = ci ? 'Modifier le CI' : 'Ajouter un CI';
@@ -611,7 +635,7 @@
         async function saveCi() {
             const id = document.getElementById('ciId').value;
             const body = {
-                fqdn: document.getElementById('ciFQDN').value,
+                hostname: document.getElementById('ciHostname').value,
                 ip: document.getElementById('ciIP').value,
                 description: document.getElementById('ciDescription').value
             };

@@ -14,14 +14,14 @@ import (
 )
 
 type FlowSubmission struct {
-	SourceFQDN string `form:"source_fqdn"`
-	SourceIP   string `form:"source_ip"`
-	TargetFQDN string `form:"target_fqdn"`
-	TargetIP   string `form:"target_ip"`
-	Protocol   string `form:"protocol"`
-	Ports      string `form:"ports"`
-	TimeLimit  string `form:"time_limit"`
-	Comment    string `form:"comment"`
+	SourceHostname string `form:"source_hostname"`
+	SourceIP       string `form:"source_ip"`
+	TargetHostname string `form:"target_hostname"`
+	TargetIP       string `form:"target_ip"`
+	Protocol       string `form:"protocol"`
+	Ports          string `form:"ports"`
+	TimeLimit      string `form:"time_limit"`
+	Comment        string `form:"comment"`
 }
 
 func SubmitHandler(c *gin.Context) {
@@ -47,14 +47,14 @@ func SubmitHandler(c *gin.Context) {
 		val := values[0]
 		field := key[strings.Index(key, "].")+2:]
 		switch field {
-		case "source_fqdn": rows[idx].SourceFQDN = val
-		case "source_ip":   rows[idx].SourceIP = val
-		case "target_fqdn": rows[idx].TargetFQDN = val
-		case "target_ip":   rows[idx].TargetIP = val
-		case "protocol":    rows[idx].Protocol = val
-		case "ports":       rows[idx].Ports = val
-		case "time_limit":  rows[idx].TimeLimit = val
-		case "comment":     rows[idx].Comment = val
+		case "source_hostname": rows[idx].SourceHostname = val
+		case "source_ip":       rows[idx].SourceIP = val
+		case "target_hostname": rows[idx].TargetHostname = val
+		case "target_ip":       rows[idx].TargetIP = val
+		case "protocol":        rows[idx].Protocol = val
+		case "ports":           rows[idx].Ports = val
+		case "time_limit":      rows[idx].TimeLimit = val
+		case "comment":         rows[idx].Comment = val
 		}
 	}
 
@@ -76,12 +76,12 @@ func SubmitHandler(c *gin.Context) {
 
 		for _, port := range ports {
 			source := sub.SourceIP
-			if source == "" && sub.SourceFQDN != "" {
-				source = sub.SourceFQDN // Cas externe
+			if source == "" && sub.SourceHostname != "" {
+				source = sub.SourceHostname // Cas externe
 			}
 			target := sub.TargetIP
-			if target == "" && sub.TargetFQDN != "" {
-				target = sub.TargetFQDN // Cas externe
+			if target == "" && sub.TargetHostname != "" {
+				target = sub.TargetHostname // Cas externe
 			}
 
 			flow := models.FlowRequest{
@@ -101,19 +101,19 @@ func SubmitHandler(c *gin.Context) {
 				}
 			}
 			
-			// We need FQDNs for the Excel generation (even if not saved)
-			flow.SourceFQDN = sub.SourceFQDN
-			flow.TargetFQDN = sub.TargetFQDN
+			// We need Hostnames for the Excel generation (even if not saved)
+			flow.SourceHostname = sub.SourceHostname
+			flow.TargetHostname = sub.TargetHostname
 			
 			flowsToExport = append(flowsToExport, flow)
 		}
 		
 		if action == "validate" {
-			if sub.SourceFQDN != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
-				ensureCI(sub.SourceFQDN, sub.SourceIP)
+			if sub.SourceHostname != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
+				ensureCI(sub.SourceHostname, sub.SourceIP)
 			}
-			if sub.TargetFQDN != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
-				ensureCI(sub.TargetFQDN, sub.TargetIP)
+			if sub.TargetHostname != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
+				ensureCI(sub.TargetHostname, sub.TargetIP)
 			}
 		}
 	}
@@ -161,15 +161,15 @@ func parsePorts(s string) []int {
 	return result
 }
 
-func ensureCI(fqdn, ip string) {
+func ensureCI(hostname, ip string) {
 	var ci models.CI
 	err := database.DB.Where("ip = ?", ip).First(&ci).Error
 	if err != nil {
-		logger.Debug("Auto-creating CI", "fqdn", fqdn, "ip", ip)
-		database.DB.Create(&models.CI{FQDN: fqdn, IP: ip})
-	} else if ci.FQDN == "" && fqdn != "" {
-		logger.Debug("Updating existing CI FQDN", "ip", ip, "new_fqdn", fqdn)
-		ci.FQDN = fqdn
+		logger.Debug("Auto-creating CI", "hostname", hostname, "ip", ip)
+		database.DB.Create(&models.CI{Hostname: hostname, IP: ip})
+	} else if ci.Hostname == "" && hostname != "" {
+		logger.Debug("Updating existing CI Hostname", "ip", ip, "new_hostname", hostname)
+		ci.Hostname = hostname
 		database.DB.Save(&ci)
 	}
 }
