@@ -59,6 +59,7 @@ func main() {
 	
 	handlers.InitOIDC()
 	h := handlers.NewHandler(db)
+	h.AutoImport()
 
 	var router *gin.Engine
 	if logger.DebugMode {

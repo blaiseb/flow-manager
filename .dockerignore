@@ -10,3 +10,4 @@ Dockerfile
 .dockerignore
 tmp/
 .gemini/
+init-data/
