@@ -18,12 +18,20 @@ import (
 	csrf "github.com/utrack/gin-csrf"
 )
 
+const Version = "0.0.1"
+
 func main() {
 	// Parsing flags
 	configPath := flag.String("config", "config.yaml", "Path to config file")
 	debugFlag := flag.Bool("debug", false, "Force enable debug mode (overrides config)")
 	portFlag := flag.Int("port", 0, "Server port (overrides config)")
+	versionFlag := flag.Bool("version", false, "Show version and exit")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("Flow Manager version %s\n", Version)
+		return
+	}
 
 	// Load Logger first (using default level until config is loaded)
 	logFile, _ := os.OpenFile("flow-manager.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
