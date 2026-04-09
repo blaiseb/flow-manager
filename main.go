@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"flow-manager/config"
 	"flow-manager/database"
 	"flow-manager/handlers"
 	"flow-manager/logger"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 
@@ -68,6 +70,14 @@ func main() {
 		router = gin.New()
 		router.Use(gin.Recovery())
 	}
+
+	// Register custom template functions
+	router.SetFuncMap(template.FuncMap{
+		"JSONMarshal": func(v interface{}) template.JS {
+			a, _ := json.Marshal(v)
+			return template.JS(a)
+		},
+	})
 
 	// Session management
 	sessionSecret := config.Global.Server.Secret
