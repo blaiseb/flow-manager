@@ -3,6 +3,8 @@ package handlers
 import (
 	"flow-manager/auth"
 	"flow-manager/models"
+	"html/template"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -10,8 +12,15 @@ import (
 
 // SetupRoutes configures all the application routes.
 func (h *Handler) SetupRoutes(router *gin.Engine, db *gorm.DB) {
-	router.Static("/static", "./static")
-	router.LoadHTMLGlob("templates/*")
+	// Use embedded templates from handler
+	templ := template.Must(template.New("").Funcs(router.FuncMap).ParseFS(h.TemplatesFS, "templates/*.html"))
+	router.SetHTMLTemplate(templ)
+
+	// Use embedded static files from handler
+	router.Any("/static/*filepath", func(c *gin.Context) {
+		fileServer := http.FileServer(http.FS(h.StaticFS))
+		fileServer.ServeHTTP(c.Writer, c.Request)
+	})
 
 	// Auth Routes
 	router.GET("/login", h.ShowLogin)

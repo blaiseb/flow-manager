@@ -10,7 +10,11 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy static and templates first (for embedding)
+COPY static ./static
+COPY templates ./templates
+
+# Copy the rest of the source code
 COPY . .
 
 # Build the application with CGO enabled for SQLite
@@ -25,11 +29,8 @@ RUN apt-get update && apt-get install -y ca-certificates libc6 && rm -rf /var/li
 WORKDIR /app
 
 # Copy the binary from the builder
+# Note: templates and static are now embedded in the binary
 COPY --from=builder /app/flow-manager .
-
-# Copy templates and default config
-COPY --from=builder /app/templates ./templates
-COPY --from=builder /app/static ./static
 COPY --from=builder /app/config.yaml.example ./config.yaml.example
 
 # Create a data directory for the SQLite database
@@ -43,5 +44,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Run the application
-# We use a command that points to the config in the app root
 CMD ["./flow-manager", "-port", "8080", "-config", "config.yaml"]

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"flag"
 	"flow-manager/config"
@@ -17,6 +18,12 @@ import (
 	"github.com/gin-gonic/gin"
 	csrf "github.com/utrack/gin-csrf"
 )
+
+//go:embed static/*
+var staticFS embed.FS
+
+//go:embed templates/*
+var templatesFS embed.FS
 
 const Version = "0.0.1"
 
@@ -68,7 +75,7 @@ func main() {
 	database.SeedDefaultData(db)
 	
 	handlers.InitOIDC()
-	h := handlers.NewHandler(db)
+	h := handlers.NewHandler(db, staticFS, templatesFS)
 	h.AutoImport()
 
 	var router *gin.Engine
