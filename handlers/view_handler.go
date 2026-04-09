@@ -93,50 +93,95 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 		}
 		flows[i].TargetVlan = database.MatchVLANOptimized(flows[i].TargetIP, parsedVlans)
 	}
-
-	var selectedVlan *models.VlanSubnet
-	var vlanIPs []IPInfo
-	vlanIDParam := c.Query("vlan_id")
-	if vlanIDParam != "" {
-		vlanID, err := strconv.Atoi(vlanIDParam)
-		if err != nil {
-			logger.Warn("Invalid vlan_id in query", "vlan_id", vlanIDParam, "error", err)
-		} else {
-			for i := range vlans {
-				if vlans[i].ID == uint(vlanID) {
-					selectedVlan = &vlans[i]
-					break
-				}
+// Handle Selected VLAN
+var selectedVlan *models.VlanSubnet
+var vlanIPs []IPInfo
+vlanIDParam := c.Query("vlan_id")
+if vlanIDParam != "" {
+	vlanID, err := strconv.Atoi(vlanIDParam)
+	if err != nil {
+		logger.Warn("Invalid vlan_id in query", "vlan_id", vlanIDParam, "error", err)
+	} else {
+		for i := range vlans {
+			if vlans[i].ID == uint(vlanID) {
+				selectedVlan = &vlans[i]
+				break
 			}
-			if selectedVlan != nil {
-				ips, err := database.GetIPsFromSubnet(selectedVlan.Subnet)
-				if err != nil {
-					logger.Error("Failed to get IPs from subnet", "subnet", selectedVlan.Subnet, "error", err)
+		}
+		if selectedVlan != nil {
+			ips, err := database.GetIPsFromSubnet(selectedVlan.Subnet)
+			if err != nil {
+				logger.Error("Failed to get IPs from subnet", "subnet", selectedVlan.Subnet, "error", err)
+			}
+			for _, ipStr := range ips {
+				info := IPInfo{IP: ipStr}
+				if ci, ok := ciMap[ipStr]; ok {
+					info.Hostname = ci.Hostname
+					info.Description = ci.Description
+					info.HasCI = true
 				}
-				for _, ipStr := range ips {
-					info := IPInfo{IP: ipStr}
-					if ci, ok := ciMap[ipStr]; ok {
-						info.Hostname = ci.Hostname
-						info.Description = ci.Description
-						info.HasCI = true
-					}
-					vlanIPs = append(vlanIPs, info)
-				}
+				vlanIPs = append(vlanIPs, info)
 			}
 		}
 	}
-
-	c.HTML(http.StatusOK, "index.html", gin.H{
-		"_csrf":        c.GetString("_csrf"),
-		"User":         currentUser,
-		"Users":        users,
-		"Flows":        flows,
-		"VLANs":        vlans,
-		"CIs":          cis,
-		"References":   references,
-		"SearchQuery":  searchQuery,
-		"ActiveTab":    activeTab,
-		"SelectedVlan": selectedVlan,
-		"VlanIPs":      vlanIPs,
-	})
 }
+
+// Handle Selected CI
+var selectedCI *models.CI
+var ciFlows []models.FlowRequest
+ciIDParam := c.Query("ci_id")
+if ciIDParam != "" {
+	ciID, err := strconv.Atoi(ciIDParam)
+	if err == nil {
+		for i := range cis {
+			if cis[i].ID == uint(ciID) {
+				selectedCI = &cis[i]
+				break
+			}
+		}
+		if selectedCI != nil {
+			// Fetch finished flows for this CI or its VLAN
+			query := h.DB.Preload("SourceCI").Preload("TargetCI").Where("status = ?", "terminé")
+
+			// Build filter: (Source=IP OR Target=IP) OR (Source=VlanSubnet OR Target=VlanSubnet)
+			if selectedCI.Vlan != nil {
+				query = query.Where("(source_ip = ? OR target_ip = ? OR source_ip = ? OR target_ip = ?)", 
+					selectedCI.IP, selectedCI.IP, selectedCI.Vlan.Subnet, selectedCI.Vlan.Subnet)
+			} else {
+				query = query.Where("(source_ip = ? OR target_ip = ?)", selectedCI.IP, selectedCI.IP)
+			}
+
+			query.Order("created_at desc").Find(&ciFlows)
+
+			// Enhance ciFlows with display names
+			for i := range ciFlows {
+				if ciFlows[i].SourceCI != nil {
+					ciFlows[i].SourceHostname = ciFlows[i].SourceCI.Hostname
+				}
+				ciFlows[i].SourceVlan = database.MatchVLANOptimized(ciFlows[i].SourceIP, parsedVlans)
+				if ciFlows[i].TargetCI != nil {
+					ciFlows[i].TargetHostname = ciFlows[i].TargetCI.Hostname
+				}
+				ciFlows[i].TargetVlan = database.MatchVLANOptimized(ciFlows[i].TargetIP, parsedVlans)
+			}
+		}
+	}
+}
+
+c.HTML(http.StatusOK, "index.html", gin.H{
+	"_csrf":        c.GetString("_csrf"),
+	"User":         currentUser,
+	"Users":        users,
+	"Flows":        flows,
+	"VLANs":        vlans,
+	"CIs":          cis,
+	"References":   references,
+	"SearchQuery":  searchQuery,
+	"ActiveTab":    activeTab,
+	"SelectedVlan": selectedVlan,
+	"VlanIPs":      vlanIPs,
+	"SelectedCI":   selectedCI,
+	"CiFlows":      ciFlows,
+})
+}
+
