@@ -60,19 +60,17 @@ func LoadConfig(path string) error {
 	Global.Auth.OIDC.GroupsClaim = "groups"
 
 	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	if err == nil {
+		defer file.Close()
+		decoder := yaml.NewDecoder(file)
+		if err := decoder.Decode(&Global); err != nil {
+			return err
 		}
-		return err
-	}
-	defer file.Close()
-
-	decoder := yaml.NewDecoder(file)
-	if err := decoder.Decode(&Global); err != nil {
+	} else if !os.IsNotExist(err) {
 		return err
 	}
 
+	// Environment variables always override config file
 	if secret := os.Getenv("FLOW_SESSION_SECRET"); secret != "" {
 		Global.Server.Secret = secret
 	}

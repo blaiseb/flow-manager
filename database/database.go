@@ -158,7 +158,6 @@ func inc(ip net.IP) {
 
 // SeedDefaultData ensures the database has an initial admin user.
 func SeedDefaultData(db *gorm.DB) {
-	// 1. Seed Admin User
 	var admin models.User
 	err := db.Where("username = ?", "admin").First(&admin).Error
 	
@@ -167,23 +166,20 @@ func SeedDefaultData(db *gorm.DB) {
 		initialPassword = "admin"
 	}
 
-	hashed, err := bcrypt.GenerateFromPassword([]byte(initialPassword), 14)
-	if err != nil {
-		logger.Error("Failed to hash initial admin password", "error", err)
+	hashed, errHash := bcrypt.GenerateFromPassword([]byte(initialPassword), 14)
+	if errHash != nil {
+		logger.Error("Failed to hash initial admin password", "error", errHash)
 		return
 	}
 
 	if err == nil {
-		// If password is still plain "admin" or not bcrypt, update it
+		// User exists, check if password needs hashing (if it's still the plain default)
 		if admin.Password == "admin" || !strings.HasPrefix(admin.Password, "$2a$") {
-			if os.Getenv("INITIAL_ADMIN_PASSWORD") == "" {
-				logger.Warn("Admin password is still 'admin'. Please change it immediately.")
-			}
 			admin.Password = string(hashed)
 			db.Save(&admin)
 			logger.Info("Admin password updated to hashed version.")
 		}
-	} else {
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
 		// Create admin
 		newAdmin := models.User{
 			Username: "admin",
@@ -193,12 +189,10 @@ func SeedDefaultData(db *gorm.DB) {
 		if err := db.Create(&newAdmin).Error; err != nil {
 			logger.Error("Failed to create default admin user", "error", err)
 		} else {
-			if os.Getenv("INITIAL_ADMIN_PASSWORD") == "" {
-				logger.Warn("Default admin 'admin' created with password 'admin'. Set INITIAL_ADMIN_PASSWORD next time.")
-			} else {
-				logger.Info("Default admin 'admin' created.")
-			}
+			logger.Info("Default admin 'admin' created.")
 		}
+	} else {
+		logger.Error("Database error during admin check", "error", err)
 	}
 }
 
