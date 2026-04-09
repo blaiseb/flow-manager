@@ -6,11 +6,9 @@ import (
 	"encoding/hex"
 	"flow-manager/auth"
 	"flow-manager/config"
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"net/http"
-	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/sessions"
