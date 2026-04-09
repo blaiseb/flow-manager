@@ -1,6 +1,7 @@
 // Flow Manager - Frontend Logic
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let standardFlows = {};
 
 async function generateMarkdownContent() {
     const form = document.getElementById('flow-form');
@@ -34,20 +35,36 @@ function copyMarkdown() {
     alert('Markdown copié !');
 }
 
-const standardFlows = {
-    'custom': { protocol: 'TCP', ports: '' },
-    'http':   { protocol: 'TCP', ports: '80' },
-    'https':  { protocol: 'TCP', ports: '443' },
-    'ssh':    { protocol: 'TCP', ports: '22' },
-    'rdp':    { protocol: 'TCP', ports: '3389' },
-    'dns':    { protocol: 'BOTH', ports: '53' },
-    'icmp':   { protocol: 'ICMP', ports: '0' },
-    'smb':    { protocol: 'TCP', ports: '445' },
-    'sql':    { protocol: 'TCP', ports: '1433' },
-    'oracle': { protocol: 'TCP', ports: '1521' },
-    'ldap':   { protocol: 'TCP', ports: '389' },
-    'ldaps':  { protocol: 'TCP', ports: '636' }
-};
+async function fetchStandardFlows() {
+    try {
+        const res = await fetch('/standard-flows');
+        if (res.ok) {
+            const data = await res.json();
+            standardFlows = { 'custom': { protocol: 'TCP', ports: '' } };
+            data.forEach(f => {
+                standardFlows[f.name.toLowerCase()] = { protocol: f.protocol, ports: f.ports };
+            });
+            updateTypeSelects();
+        }
+    } catch (err) { console.error("Failed to fetch standard flows", err); }
+}
+
+function updateTypeSelects() {
+    const selects = document.querySelectorAll('select[id^="flow_type_"]');
+    selects.forEach(select => {
+        const currentVal = select.value;
+        select.innerHTML = '<option value="custom">Manuel</option>';
+        Object.keys(standardFlows).forEach(key => {
+            if (key !== 'custom') {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = key.toUpperCase();
+                select.appendChild(opt);
+            }
+        });
+        select.value = currentVal;
+    });
+}
 
 function addRow() {
     const tbody = document.getElementById('form-body');
@@ -58,6 +75,13 @@ function addRow() {
     let scopeOptions = `<option value="">-- Machine isolée --</option><option value="EXTERNAL">-- Externe (Hostname) --</option>`;
     availableVlans.forEach(v => { scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`; });
     
+    let typeOptions = '<option value="custom">Manuel</option>';
+    Object.keys(standardFlows).forEach(key => {
+        if (key !== 'custom') {
+            typeOptions += `<option value="${key}">${key.toUpperCase()}</option>`;
+        }
+    });
+
     row.innerHTML = `
         <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
         <td><select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">${scopeOptions}</select><input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto"></td>
@@ -68,18 +92,7 @@ function addRow() {
         <td><input type="text" name="flows[${idx}].target_hostname" class="form-control" id="target_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
         <td>
             <select class="form-select" id="flow_type_${idx}" onchange="applyStandardFlow(${idx}, this.value)">
-                <option value="custom">Manuel</option>
-                <option value="http">HTTP</option>
-                <option value="https">HTTPS</option>
-                <option value="ssh">SSH</option>
-                <option value="rdp">RDP</option>
-                <option value="dns">DNS</option>
-                <option value="icmp">ICMP (Ping)</option>
-                <option value="smb">SMB/CIFS</option>
-                <option value="sql">SQL Server</option>
-                <option value="oracle">Oracle DB</option>
-                <option value="ldap">LDAP</option>
-                <option value="ldaps">LDAPS</option>
+                ${typeOptions}
             </select>
         </td>
         <td>
@@ -149,6 +162,73 @@ async function lookupCI(q, idx, type) {
     } catch (err) { console.error(err); }
 }
 
+// Administration Logic
+async function loadStandardFlows() {
+    const tbody = document.getElementById('standard-flows-table-body');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
+    try {
+        const res = await fetch('/standard-flows');
+        if (res.ok) {
+            const data = await res.json();
+            tbody.innerHTML = '';
+            data.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${f.name}</td>
+                    <td>${f.protocol}</td>
+                    <td>${f.ports}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick='prepareStandardFlowModal(${JSON.stringify(f)})'>Modifier</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteStandardFlow(${f.ID})">Supprimer</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch (err) { console.error(err); }
+}
+
+function prepareStandardFlowModal(flow) {
+    document.getElementById('standardFlowModalLabel').innerText = flow ? 'Modifier le flux' : 'Ajouter un flux';
+    document.getElementById('flowId').value = flow ? flow.ID : '';
+    document.getElementById('flowName').value = flow ? flow.name : '';
+    document.getElementById('flowProtocol').value = flow ? flow.protocol : 'TCP';
+    document.getElementById('flowPorts').value = flow ? flow.ports : '';
+    const modal = new bootstrap.Modal(document.getElementById('standardFlowModal'));
+    modal.show();
+}
+
+async function saveStandardFlow() {
+    const id = document.getElementById('flowId').value;
+    const data = {
+        name: document.getElementById('flowName').value,
+        protocol: document.getElementById('flowProtocol').value,
+        ports: document.getElementById('flowPorts').value
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/standard-flow/${id}` : '/standard-flow';
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify(data)
+    });
+    if (res.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('standardFlowModal')).hide();
+        loadStandardFlows();
+        fetchStandardFlows(); // Update the cache for the request form
+    } else alert('Erreur lors de la sauvegarde');
+}
+
+async function deleteStandardFlow(id) {
+    if (!confirm('Supprimer ce flux standard ?')) return;
+    const res = await fetch(`/standard-flow/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
+    if (res.ok) {
+        loadStandardFlows();
+        fetchStandardFlows();
+    }
+}
+
+// User / VLAN / CI existing functions...
 function prepareVlanModal(vlan) {
     document.getElementById('vlanModalLabel').innerText = vlan ? 'Modifier le VLAN' : 'Ajouter un VLAN';
     document.getElementById('vlanId').value = vlan ? vlan.ID : '';
@@ -267,7 +347,7 @@ async function saveUser() {
         role: document.getElementById('userRole').value
     };
     const method = id ? 'PUT' : 'POST';
-    const url = id ? `/user/${id}` : '/user';
+    const url = id ? `/users/${id}` : '/users';
     const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
@@ -278,10 +358,11 @@ async function saveUser() {
 
 async function deleteUser(id) {
     if (!confirm('Supprimer cet utilisateur ?')) return;
-    const res = await fetch(`/user/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
+    const res = await fetch(`/users/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
     if (res.ok) location.reload();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    fetchStandardFlows();
     if (document.getElementById('form-body')) addRow();
 });

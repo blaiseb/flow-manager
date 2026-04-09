@@ -69,6 +69,14 @@ func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {
 }
 
 // VlanSubnet represents a VLAN / Subnet.
+// StandardFlow represents a pre-defined flow type (e.g., HTTPS -> TCP/443).
+type StandardFlow struct {
+	gorm.Model
+	Name     string `json:"name" gorm:"unique;not null" binding: "required"`
+	Protocol string `json:"protocol" gorm:"not null" binding: "required"`
+	Ports    string `json:"ports"`
+}
+
 type VlanSubnet struct {
 	gorm.Model
 	Subnet     string `json:"subnet" gorm:"unique;not null" binding:"required"`

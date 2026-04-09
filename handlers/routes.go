@@ -30,6 +30,7 @@ func (h *Handler) SetupRoutes(router *gin.Engine, db *gorm.DB) {
 		authorized.GET("/ci/lookup", h.CiLookupHandler)
 		authorized.GET("/ci/suggest", h.CiSuggestHandler)
 		authorized.GET("/ci/export", h.ExportCIs)
+		authorized.GET("/standard-flows", h.ListStandardFlows)
 
 		// Requestor level
 		requestor := authorized.Group("/")
@@ -63,6 +64,10 @@ func (h *Handler) SetupRoutes(router *gin.Engine, db *gorm.DB) {
 			adminOnly.POST("/users", h.CreateUser)
 			adminOnly.PUT("/users/:id", h.UpdateUser)
 			adminOnly.DELETE("/users/:id", h.DeleteUser)
+
+			adminOnly.POST("/standard-flow", h.CreateStandardFlow)
+			adminOnly.PUT("/standard-flow/:id", h.UpdateStandardFlow)
+			adminOnly.DELETE("/standard-flow/:id", h.DeleteStandardFlow)
 		}
 	}
 }

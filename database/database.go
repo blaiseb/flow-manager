@@ -228,9 +228,30 @@ func InitDatabase() *gorm.DB {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
-	err = db.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{})
+	err = db.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{}, &models.StandardFlow{})
 	if err != nil {
 		logger.Fatal("Failed to migrate database", "error", err)
+	}
+
+	// Initialiser les flux standards si vide
+	var flowCount int64
+	db.Model(&models.StandardFlow{}).Count(&flowCount)
+	if flowCount == 0 {
+		defaults := []models.StandardFlow{
+			{Name: "HTTP", Protocol: "TCP", Ports: "80"},
+			{Name: "HTTPS", Protocol: "TCP", Ports: "443"},
+			{Name: "SSH", Protocol: "TCP", Ports: "22"},
+			{Name: "RDP", Protocol: "TCP", Ports: "3389"},
+			{Name: "DNS", Protocol: "BOTH", Ports: "53"},
+			{Name: "ICMP", Protocol: "ICMP", Ports: "0"},
+			{Name: "SMB", Protocol: "TCP", Ports: "445"},
+			{Name: "SQL Server", Protocol: "TCP", Ports: "1433"},
+			{Name: "Oracle", Protocol: "TCP", Ports: "1521"},
+			{Name: "LDAP", Protocol: "TCP", Ports: "389"},
+			{Name: "LDAPS", Protocol: "TCP", Ports: "636"},
+		}
+		db.Create(&defaults)
+		logger.Info("Default standard flows seeded.")
 	}
 
 	logger.Info("Database connection successful and schemas migrated.")

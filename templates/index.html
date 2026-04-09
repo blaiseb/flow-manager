@@ -403,8 +403,10 @@
                 <div class="mt-3">
                     <ul class="nav nav-pills mb-3" id="adminSubTab" role="tablist">
                         <li class="nav-item"><button class="nav-link active" id="admin-users-tab" data-bs-toggle="pill" data-bs-target="#admin-users-pane" type="button">Utilisateurs</button></li>
+                        <li class="nav-item"><button class="nav-link" id="admin-flows-tab" data-bs-toggle="pill" data-bs-target="#admin-flows-pane" type="button" onclick="loadStandardFlows()">Flux Standards</button></li>
                     </ul>
                     <div class="tab-content" id="adminSubTabContent">
+                        <!-- Gestion des Utilisateurs -->
                         <div class="tab-pane fade show active" id="admin-users-pane" role="tabpanel">
                             <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal(null)">Ajouter un utilisateur</button>
                             <div class="table-responsive">
@@ -424,6 +426,18 @@
                                 </table>
                             </div>
                         </div>
+                        <!-- Gestion des Flux Standards -->
+                        <div class="tab-pane fade" id="admin-flows-pane" role="tabpanel">
+                            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#standardFlowModal" onclick="prepareStandardFlowModal(null)">Ajouter un type de flux</button>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead><tr><th>Nom</th><th>Protocole</th><th>Port(s)</th><th>Actions</th></tr></thead>
+                                    <tbody id="standard-flows-table-body">
+                                        <tr><td colspan="4" class="text-center">Chargement...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -432,6 +446,9 @@
     </div>
 
     <!-- Modals -->
+    <div class="modal fade" id="standardFlowModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="standardFlowModalLabel">Flux Standard</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="standardFlowForm"><input type="hidden" id="flowId"><div class="mb-3"><label class="form-label">Nom (ex: HTTPS)</label><input type="text" class="form-control" id="flowName" required></div><div class="mb-3"><label class="form-label">Protocole</label><select class="form-select" id="flowProtocol"><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="BOTH">TCP & UDP</option><option value="ICMP">ICMP</option></select></div><div class="mb-3"><label class="form-label">Port(s)</label><input type="text" class="form-control" id="flowPorts" placeholder="ex: 443"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveStandardFlow()">Sauvegarder</button></div></div></div>
+    </div>
     <div class="modal fade" id="vlanModal" tabindex="-1">
         <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="vlanModalLabel">VLAN</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="vlanForm"><input type="hidden" id="vlanId"><div class="mb-3"><label class="form-label">Subnet (ex: 192.168.1.0/24)</label><input type="text" class="form-control" id="vlanSubnet" required></div><div class="mb-3"><label class="form-label">Nom du VLAN</label><input type="text" class="form-control" id="vlanName" required></div><div class="mb-3"><label class="form-label">Gateway</label><input type="text" class="form-control" id="vlanGateway"></div><div class="mb-3"><label class="form-label">Serveurs DNS (séparés par des espaces)</label><input type="text" class="form-control" id="vlanDNSServers"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveVlan()">Sauvegarder</button></div></div></div>
     </div>
