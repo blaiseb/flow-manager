@@ -37,12 +37,13 @@ type Config struct {
 			RoleMappings map[string]string `yaml:"role_mappings"`
 		} `yaml:"proxy"`
 		OIDC struct {
-			Issuer       string `yaml:"issuer"`
-			ClientID     string `yaml:"client_id"`
-			ClientSecret string `yaml:"client_secret"`
-			RedirectURL  string `yaml:"redirect_url"`
-			GroupsClaim  string `yaml:"groups_claim"` // Nom du claim pour les groupes, ex: "groups"
-			RoleMappings map[string]string `yaml:"role_mappings"`
+			Issuer             string            `yaml:"issuer"`
+			ClientID           string            `yaml:"client_id"`
+			ClientSecret       string            `yaml:"client_secret"`
+			RedirectURL        string            `yaml:"redirect_url"`
+			GroupsClaim        string            `yaml:"groups_claim"` // Nom du claim pour les groupes, ex: "groups"
+			RoleMappings       map[string]string `yaml:"role_mappings"`
+			InsecureSkipVerify bool              `yaml:"insecure_skip_verify"`
 		} `yaml:"oidc"`
 	} `yaml:"auth"`
 }

@@ -1,14 +1,16 @@
 package handlers
-
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"flow-manager/auth"
 	"flow-manager/config"
+	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"net/http"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-contrib/sessions"
@@ -29,6 +31,17 @@ func InitOIDC() {
 	}
 
 	ctx := context.Background()
+
+	// Configure custom HTTP client if InsecureSkipVerify is enabled
+	if config.Global.Auth.OIDC.InsecureSkipVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+		ctx = oidc.ClientContext(ctx, client)
+		logger.Warn("OIDC: InsecureSkipVerify enabled. Skipping TLS verification.")
+	}
+
 	provider, err := oidc.NewProvider(ctx, config.Global.Auth.OIDC.Issuer)
 	if err != nil {
 		logger.Fatal("Failed to get OIDC provider", "error", err)

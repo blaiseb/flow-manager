@@ -31,6 +31,7 @@ auth:
     client_secret: "votre-secret"
     redirect_url: "http://localhost:8080/oidc/callback"
     groups_claim: "groups"
+    insecure_skip_verify: false # Mettre à true si vous utilisez un certificat auto-signé
     role_mappings:
       "admins": "admin"
       "it-ops": "actor"
