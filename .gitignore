@@ -35,3 +35,12 @@
 # Répertoires temporaires
 /tmp/
 .gemini/
+
+# Fichiers de configuration sensibles
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
