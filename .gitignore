@@ -43,4 +43,5 @@
 .env.test.local
 .env.production.local
 *.env
+config.yaml
 
