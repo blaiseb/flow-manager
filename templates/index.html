@@ -146,7 +146,7 @@
                                     <td>
                                         {{ if .SourceHostname }}
                                             <a href="/?tab=view&search={{ .SourceHostname }}">{{ .SourceHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=vlan&vlan_id={{ .SourceVlan.ID }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted">{{ if .SourceVlan }}<a href="/?tab=vlan&vlan_id={{ .SourceVlan.ID }}" class="text-muted">{{ .SourceIP }}</a> ({{ .SourceVlan.VLAN }}){{ else }}{{ .SourceIP }} (Inconnu){{ end }}</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .SourceIP }}">{{ .SourceIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
@@ -155,7 +155,7 @@
                                     <td>
                                         {{ if .TargetHostname }}
                                             <a href="/?tab=view&search={{ .TargetHostname }}">{{ .TargetHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=vlan&vlan_id={{ .TargetVlan.ID }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted">{{ if .TargetVlan }}<a href="/?tab=vlan&vlan_id={{ .TargetVlan.ID }}" class="text-muted">{{ .TargetIP }}</a> ({{ .TargetVlan.VLAN }}){{ else }}{{ .TargetIP }} (Inconnu){{ end }}</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .TargetIP }}">{{ .TargetIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
