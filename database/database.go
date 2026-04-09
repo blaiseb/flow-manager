@@ -156,25 +156,9 @@ func inc(ip net.IP) {
 	}
 }
 
-// SeedDefaultData ensures the database has an initial admin user and default VLANs.
+// SeedDefaultData ensures the database has an initial admin user.
 func SeedDefaultData(db *gorm.DB) {
-	// 1. Seed VLANs
-	var count int64
-	db.Model(&models.VlanSubnet{}).Count(&count)
-	if count == 0 {
-		logger.Info("Seeding VlanSubnet table with initial data...")
-		vlans := []models.VlanSubnet{
-			{Subnet: "192.168.1.0/24", VLAN: "VLAN_SERVERS"},
-			{Subnet: "10.0.0.0/8", VLAN: "VLAN_CORP"},
-			{Subnet: "172.16.0.0/12", VLAN: "VLAN_GUEST"},
-			{Subnet: "::1/128", VLAN: "VLAN_LOCALHOST"},
-		}
-		if err := db.Create(&vlans).Error; err != nil {
-			logger.Error("Failed to seed VlanSubnet table", "error", err)
-		}
-	}
-
-	// 2. Seed Admin User
+	// 1. Seed Admin User
 	var admin models.User
 	err := db.Where("username = ?", "admin").First(&admin).Error
 	
