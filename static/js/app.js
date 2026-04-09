@@ -165,6 +165,7 @@ async function lookupCI(q, idx, type) {
 // Administration Logic
 async function loadStandardFlows() {
     const tbody = document.getElementById('standard-flows-table-body');
+    if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="4" class="text-center">Chargement...</td></tr>';
     try {
         const res = await fetch('/standard-flows');
@@ -332,7 +333,7 @@ async function saveFlowEdit() {
 }
 
 function prepareUserModal(user) {
-    document.getElementById('userModalLabel').innerText = user ? 'Modifier l\\'utilisateur' : 'Ajouter un utilisateur';
+    document.getElementById('userModalLabel').innerText = user ? "Modifier l'utilisateur" : "Ajouter un utilisateur";
     document.getElementById('userId').value = user ? user.ID : '';
     document.getElementById('userUsername').value = user ? user.Username : '';
     document.getElementById('userPassword').value = '';
