@@ -136,6 +136,8 @@ func mapGroupsToRole(groups string) string {
 func MapOIDCGroupsToRole(groups interface{}) string {
 	var groupList []string
 
+	logger.Debug("OIDC Raw groups received", "raw", groups)
+
 	switch g := groups.(type) {
 	case string:
 		groupList = strings.FieldsFunc(g, func(r rune) bool {
@@ -150,6 +152,8 @@ func MapOIDCGroupsToRole(groups interface{}) string {
 	case []string:
 		groupList = g
 	}
+
+	logger.Debug("OIDC Extracted group list", "groups", groupList)
 
 	mappings := config.Global.Auth.OIDC.RoleMappings
 	if len(mappings) == 0 {

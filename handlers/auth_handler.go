@@ -112,9 +112,13 @@ func (h *Handler) OIDCCallback(c *gin.Context) {
 	// Re-parse with dynamic groups claim
 	var allClaims map[string]interface{}
 	if err := idToken.Claims(&allClaims); err != nil {
+		logger.Error("Failed to parse OIDC claims", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// DEBUG: Log all received claims to help troubleshoot group mapping
+	logger.Debug("OIDC Claims received", "claims", allClaims)
 
 	username, _ := allClaims["preferred_username"].(string)
 	if username == "" {
@@ -128,7 +132,11 @@ func (h *Handler) OIDCCallback(c *gin.Context) {
 	groupsClaimName := config.Global.Auth.OIDC.GroupsClaim
 	role := models.RoleViewer
 	if g, ok := allClaims[groupsClaimName]; ok {
+		logger.Debug("OIDC: Found groups claim", "claim_name", groupsClaimName, "raw_value", g)
 		role = auth.MapOIDCGroupsToRole(g)
+		logger.Debug("OIDC: Mapped role", "role", role)
+	} else {
+		logger.Warn("OIDC: Groups claim not found in ID Token", "expected_claim", groupsClaimName)
 	}
 
 	// Fetch or Create user
