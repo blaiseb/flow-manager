@@ -143,7 +143,7 @@
                                     <td>
                                         {{ if .SourceHostname }}
                                             <a href="/?tab=view&search={{ .SourceHostname }}">{{ .SourceHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}<a href="/?tab=vlan&vlan_id={{ .SourceVlan.ID }}" class="text-muted">{{ .SourceVlan.VLAN }}</a>{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted"><a href="/?tab=vlan&vlan_id={{ .SourceVlan.ID }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .SourceIP }}">{{ .SourceIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
@@ -152,7 +152,7 @@
                                     <td>
                                         {{ if .TargetHostname }}
                                             <a href="/?tab=view&search={{ .TargetHostname }}">{{ .TargetHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}<a href="/?tab=vlan&vlan_id={{ .TargetVlan.ID }}" class="text-muted">{{ .TargetVlan.VLAN }}</a>{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted"><a href="/?tab=vlan&vlan_id={{ .TargetVlan.ID }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .TargetIP }}">{{ .TargetIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
@@ -216,7 +216,6 @@
                                 <table class="table table-striped table-hover">
                                     <thead>
                                         <tr>
-                                            <th>ID</th>
                                             <th>Subnet</th>
                                             <th>VLAN</th>
                                             <th>Actions</th>
@@ -225,7 +224,6 @@
                                     <tbody>
                                         {{ range .VLANs }}
                                         <tr>
-                                            <td>{{ .ID }}</td>
                                             <td>{{ .Subnet }}</td>
                                             <td><a href="/?tab=vlan&vlan_id={{ .ID }}">{{ .VLAN }}</a></td>
                                             <td>
@@ -238,7 +236,7 @@
                                             </td>
                                         </tr>
                                         {{ else }}
-                                        <tr><td colspan="4" class="text-center">Aucun VLAN à afficher.</td></tr>
+                                        <tr><td colspan="3" class="text-center">Aucun VLAN à afficher.</td></tr>
                                         {{ end }}
                                     </tbody>
                                 </table>
@@ -314,12 +312,11 @@
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
                                     <thead>
-                                        <tr><th>ID</th><th>IP</th><th>Hostname</th><th>Description</th><th>VLAN</th><th>Dernière Mise à jour</th><th>Actions</th></tr>
+                                        <tr><th>IP</th><th>Hostname</th><th>Description</th><th>VLAN</th><th>Dernière Mise à jour</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         {{ range .CIs }}
                                         <tr>
-                                            <td>{{ .ID }}</td>
                                             <td><code>{{ .IP }}</code></td>
                                             <td><a href="/?tab=ci&ci_id={{ .ID }}">{{ .Hostname }}</a></td>
                                             <td>{{ .Description }}</td>
@@ -332,7 +329,7 @@
                                                 {{ else }}-{{ end }}
                                             </td>
                                         </tr>
-                                        {{ else }}<tr><td colspan="7" class="text-center">Aucun CI à afficher.</td></tr>{{ end }}
+                                        {{ else }}<tr><td colspan="6" class="text-center">Aucun CI à afficher.</td></tr>{{ end }}
                                     </tbody>
                                 </table>
                             </div>
@@ -411,11 +408,11 @@
                             <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal(null)">Ajouter un utilisateur</button>
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
-                                    <thead><tr><th>ID</th><th>Utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>
+                                    <thead><tr><th>Utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>
                                     <tbody>
                                         {{ range .Users }}
                                         <tr>
-                                            <td>{{ .ID }}</td><td>{{ .Username }}</td><td><span class="badge bg-info text-dark">{{ .Role }}</span></td>
+                                            <td>{{ .Username }}</td><td><span class="badge bg-info text-dark">{{ .Role }}</span></td>
                                             <td>
                                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal({ID: {{.ID}}, Username: '{{.Username}}', Role: '{{.Role}}'})">Modifier</button>
                                                 {{ if ne .Username "admin" }}<button class="btn btn-sm btn-danger" onclick="deleteUser({{ .ID }})">Supprimer</button>{{ end }}
