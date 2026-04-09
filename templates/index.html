@@ -142,7 +142,7 @@
                                     <td>
                                         {{ if .SourceHostname }}
                                             <a href="/?tab=view&search={{ .SourceHostname }}">{{ .SourceHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}{{ .SourceVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .SourceIP }}" class="text-muted">{{ .SourceIP }}</a> ({{ if .SourceVlan }}<a href="/?tab=vlan&vlan_id={{ .SourceVlan.ID }}" class="text-muted">{{ .SourceVlan.VLAN }}</a>{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .SourceIP }}">{{ .SourceIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
@@ -151,7 +151,7 @@
                                     <td>
                                         {{ if .TargetHostname }}
                                             <a href="/?tab=view&search={{ .TargetHostname }}">{{ .TargetHostname }}</a>
-                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}{{ .TargetVlan.VLAN }}{{ else }}Inconnu{{ end }})</small>
+                                            <br><small class="text-muted"><a href="/?tab=view&search={{ .TargetIP }}" class="text-muted">{{ .TargetIP }}</a> ({{ if .TargetVlan }}<a href="/?tab=vlan&vlan_id={{ .TargetVlan.ID }}" class="text-muted">{{ .TargetVlan.VLAN }}</a>{{ else }}Inconnu{{ end }})</small>
                                         {{ else }}
                                             <a href="/?tab=view&search={{ .TargetIP }}">{{ .TargetIP }}</a>
                                             <br><small class="text-muted">Externe / Subnet</small>
@@ -298,7 +298,7 @@
                             <tbody>
                                 {{ range .CIs }}
                                 <tr>
-                                    <td>{{ .ID }}</td><td>{{ .IP }}</td><td>{{ .Hostname }}</td><td>{{ .Description }}</td><td>{{ if .Vlan }}{{ .Vlan.VLAN }}{{ else }}Non défini{{ end }}</td><td>{{ .UpdatedAt.Format "02/01/2006 15:04" }}</td>
+                                    <td>{{ .ID }}</td><td>{{ .IP }}</td><td>{{ .Hostname }}</td><td>{{ .Description }}</td><td>{{ if .Vlan }}<a href="/?tab=vlan&vlan_id={{ .Vlan.ID }}">{{ .Vlan.VLAN }}</a>{{ else }}Non défini{{ end }}</td><td>{{ .UpdatedAt.Format "02/01/2006 15:04" }}</td>
                                     <td>
                                         {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
                                         <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#ciModal" onclick="prepareCiModal({ID: {{.ID}}, Hostname: '{{.Hostname}}', IP: '{{.IP}}', Description: '{{.Description}}'})">Modifier</button>
