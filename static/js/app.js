@@ -321,11 +321,15 @@ function prepareFlowEditModal(id, ruleNumber, status, comment, history) {
     if (history && history.length > 0) {
         history.forEach(h => {
             const tr = document.createElement('tr');
-            const date = new Date(h.CreatedAt).toLocaleString('fr-FR');
+            // GORM/JSON can use created_at or CreatedAt depending on tags
+            const rawDate = h.created_at || h.CreatedAt;
+            const dateObj = new Date(rawDate);
+            const dateStr = isNaN(dateObj.getTime()) ? 'Date inconnue' : dateObj.toLocaleString('fr-FR');
+            
             tr.innerHTML = `
-                <td>${date}</td>
+                <td>${dateStr}</td>
                 <td><span class="badge ${h.status === 'terminé' ? 'bg-success' : 'bg-secondary'}">${h.status}</span></td>
-                <td>${h.actor}</td>
+                <td>${h.actor || 'Système'}</td>
             `;
             historyTbody.appendChild(tr);
         });
