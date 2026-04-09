@@ -35,6 +35,7 @@
 # Répertoires temporaires
 /tmp/
 .gemini/
+data/
 
 # Fichiers de configuration sensibles
 .env
