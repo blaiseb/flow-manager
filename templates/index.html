@@ -13,6 +13,9 @@
         .form-row-header th { text-align: center; font-size: 0.9rem; }
         .form-row-inputs td { min-width: 150px; }
         .nav-sub { margin-top: -1px; background: #f8f9fa; border: 1px solid #dee2e6; border-top: none; padding: 10px; border-radius: 0 0 .375rem .375rem; }
+        th.sortable { cursor: pointer; position: relative; }
+        th.sortable:hover { background-color: #f0f0f0; }
+        th.sortable::after { content: ' \21C5'; font-size: 0.8em; color: #ccc; }
     </style>
 </head>
 <body>
@@ -122,17 +125,17 @@
                         <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
-                                    <th>Référence</th>
-                                    <th>Source</th>
-                                    <th>Cible</th>
-                                    <th>Protocole</th>
-                                    <th>Port</th>
-                                    <th>Limite</th>
-                                    <th>Rule #</th>
-                                    <th>Date</th>
-                                    <th>Statut</th>
-                                    <th>Acteur</th>
-                                    <th>Commentaire</th>
+                                    <th class="sortable">Référence</th>
+                                    <th class="sortable">Source</th>
+                                    <th class="sortable">Cible</th>
+                                    <th class="sortable">Protocole</th>
+                                    <th class="sortable">Port</th>
+                                    <th class="sortable">Limite</th>
+                                    <th class="sortable">Rule #</th>
+                                    <th class="sortable">Date</th>
+                                    <th class="sortable">Statut</th>
+                                    <th class="sortable">Acteur</th>
+                                    <th class="sortable">Commentaire</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -216,8 +219,8 @@
                                 <table class="table table-striped table-hover">
                                     <thead>
                                         <tr>
-                                            <th>Subnet</th>
-                                            <th>VLAN</th>
+                                            <th class="sortable">Subnet</th>
+                                            <th class="sortable">VLAN</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -258,7 +261,7 @@
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped table-hover">
                                     <thead>
-                                        <tr><th>IP</th><th>Hostname</th><th>Description</th><th>Historique</th></tr>
+                                        <tr><th class="sortable">IP</th><th class="sortable">Hostname</th><th class="sortable">Description</th><th>Historique</th></tr>
                                     </thead>
                                     <tbody>
                                         {{ range .VlanIPs }}
@@ -312,7 +315,7 @@
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
                                     <thead>
-                                        <tr><th>IP</th><th>Hostname</th><th>Description</th><th>VLAN</th><th>Dernière Mise à jour</th><th>Actions</th></tr>
+                                        <tr><th class="sortable">IP</th><th class="sortable">Hostname</th><th class="sortable">Description</th><th class="sortable">VLAN</th><th class="sortable">Dernière Mise à jour</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
                                         {{ range .CIs }}
@@ -356,13 +359,13 @@
                                 <table class="table table-sm table-striped table-hover border">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Source</th>
-                                            <th>Target</th>
-                                            <th>Protocole</th>
-                                            <th>Port</th>
-                                            <th>Limite</th>
-                                            <th>Rule #</th>
-                                            <th>Référence</th>
+                                            <th class="sortable">Source</th>
+                                            <th class="sortable">Target</th>
+                                            <th class="sortable">Protocole</th>
+                                            <th class="sortable">Port</th>
+                                            <th class="sortable">Limite</th>
+                                            <th class="sortable">Rule #</th>
+                                            <th class="sortable">Référence</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -408,7 +411,7 @@
                             <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#userModal" onclick="prepareUserModal(null)">Ajouter un utilisateur</button>
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
-                                    <thead><tr><th>Utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>
+                                    <thead><tr><th class="sortable">Utilisateur</th><th class="sortable">Rôle</th><th>Actions</th></tr></thead>
                                     <tbody>
                                         {{ range .Users }}
                                         <tr>
@@ -428,7 +431,7 @@
                             <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#standardFlowModal" onclick="prepareStandardFlowModal(null)">Ajouter un type de flux</button>
                             <div class="table-responsive">
                                 <table class="table table-striped table-hover">
-                                    <thead><tr><th>Nom</th><th>Protocole</th><th>Port(s)</th><th>Actions</th></tr></thead>
+                                    <thead><tr><th class="sortable">Nom</th><th class="sortable">Protocole</th><th class="sortable">Port(s)</th><th>Actions</th></tr></thead>
                                     <tbody id="standard-flows-table-body">
                                         <tr><td colspan="4" class="text-center">Chargement...</td></tr>
                                     </tbody>
@@ -455,7 +458,7 @@
     </div>
 
     <div class="modal fade" id="flowEditModal" tabindex="-1">
-        <div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Mise à jour du flux</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="flowEditForm"><input type="hidden" id="editFlowId"><div class="row"><div class="col-md-6"><div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div></div><div class="col-md-6"><div class="mb-3"><label class="form-label">Statut</label><select class="form-select" id="editStatus"><option value="demandé">Demandé</option><option value="en cours">En cours</option><option value="terminé">Terminé</option><option value="refusé">Refusé</option></select></div></div></div><div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="2"></textarea></div></form><hr><h6>Historique des modifications</h6><div class="table-responsive"><table class="table table-sm table-striped border"><thead><tr><th>Date</th><th>Statut</th><th>Acteur</th></tr></thead><tbody id="flowHistoryTableBody"></tbody></table></div></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button></div></div></div>
+        <div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Mise à jour du flux</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="flowEditForm"><input type="hidden" id="editFlowId"><div class="row"><div class="col-md-6"><div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div></div><div class="col-md-6"><div class="mb-3"><label class="form-label">Statut</label><select class="form-select" id="editStatus"><option value="demandé">Demandé</option><option value="en cours">En cours</option><option value="terminé">Terminé</option><option value="refusé">Refusé</option></select></div></div></div><div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="2"></textarea></div></form>hr><h6>Historique des modifications</h6><div class="table-responsive"><table class="table table-sm table-striped border"><thead><tr><th>Date</th><th>Statut</th><th>Acteur</th></tr></thead><tbody id="flowHistoryTableBody"></tbody></table></div></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button></div></div></div>
     </div>
 
     <div class="modal fade" id="userModal" tabindex="-1">

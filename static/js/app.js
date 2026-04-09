@@ -162,6 +162,52 @@ async function lookupCI(q, idx, type) {
     } catch (err) { console.error(err); }
 }
 
+// Sorting logic
+function setupTableSorting() {
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const table = th.closest('table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const columnIdx = Array.from(th.parentNode.children).indexOf(th);
+            const isAscending = th.classList.contains('sort-asc');
+            
+            // Clear other headers
+            th.parentNode.querySelectorAll('th').forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc');
+            });
+
+            rows.sort((a, b) => {
+                let cellA = a.children[columnIdx].textContent.trim();
+                let cellB = b.children[columnIdx].textContent.trim();
+
+                // Handle numbers (ports, IDs)
+                if (!isNaN(cellA) && !isNaN(cellB) && cellA !== '' && cellB !== '') {
+                    return isAscending ? cellB - cellA : cellA - cellB;
+                }
+
+                // Handle dates (JJ/MM/AAAA)
+                const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})/;
+                if (dateRegex.test(cellA) && dateRegex.test(cellB)) {
+                    const dA = new Date(cellA.replace(dateRegex, '$3-$2-$1'));
+                    const dB = new Date(cellB.replace(dateRegex, '$3-$2-$1'));
+                    return isAscending ? dB - dA : dA - dB;
+                }
+
+                // Default string comparison
+                return isAscending 
+                    ? cellB.localeCompare(cellA, 'fr', {numeric: true}) 
+                    : cellA.localeCompare(cellB, 'fr', {numeric: true});
+            });
+
+            th.classList.toggle('sort-asc', !isAscending);
+            th.classList.toggle('sort-desc', isAscending);
+            
+            rows.forEach(row => tbody.appendChild(row));
+        });
+    });
+}
+
 // Administration Logic
 async function loadStandardFlows() {
     const tbody = document.getElementById('standard-flows-table-body');
@@ -386,5 +432,6 @@ async function deleteUser(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchStandardFlows();
+    setupTableSorting();
     if (document.getElementById('form-body')) addRow();
 });
