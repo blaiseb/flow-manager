@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"flow-manager/database"
 	"flow-manager/logger"
 	"flow-manager/models"
 	"net/http"
@@ -11,10 +10,10 @@ import (
 )
 
 // UpdateFlow handles the update of an existing flow request (status, rule number, etc.)
-func UpdateFlow(c *gin.Context) {
+func (h *Handler) UpdateFlow(c *gin.Context) {
 	id := c.Param("id")
 	var flow models.FlowRequest
-	if err := database.DB.First(&flow, id).Error; err != nil {
+	if err := h.DB.First(&flow, id).Error; err != nil {
 		logger.Error("Flow not found for update", "id", id, "error", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Flow not found"})
 		return
@@ -44,7 +43,7 @@ func UpdateFlow(c *gin.Context) {
 	flow.Status = input.Status
 	flow.Comment = input.Comment
 
-	if err := database.DB.Save(&flow).Error; err != nil {
+	if err := h.DB.Save(&flow).Error; err != nil {
 		logger.Error("Failed to save updated flow", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update flow: " + err.Error()})
 		return
@@ -54,16 +53,16 @@ func UpdateFlow(c *gin.Context) {
 }
 
 // DeleteFlow handles the deletion of a flow request.
-func DeleteFlow(c *gin.Context) {
+func (h *Handler) DeleteFlow(c *gin.Context) {
 	id := c.Param("id")
 	logger.Info("Deleting flow", "id", id)
 	var flow models.FlowRequest
-	if err := database.DB.First(&flow, id).Error; err != nil {
+	if err := h.DB.First(&flow, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Flow not found"})
 		return
 	}
 
-	if err := database.DB.Delete(&flow).Error; err != nil {
+	if err := h.DB.Delete(&flow).Error; err != nil {
 		logger.Error("Failed to delete flow", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete flow"})
 		return

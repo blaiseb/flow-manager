@@ -11,7 +11,7 @@ import (
 )
 
 // CiLookupHandler handles the lookup of a CI by IP address or Hostname.
-func CiLookupHandler(c *gin.Context) {
+func (h *Handler) CiLookupHandler(c *gin.Context) {
 	query := c.Query("query")
 	if query == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter is required"})
@@ -23,7 +23,7 @@ func CiLookupHandler(c *gin.Context) {
 	query = strings.ToLower(query)
 	var ci models.CI
 	// Search by IP or Hostname
-	err := database.DB.Where("ip = ? OR hostname = ?", query, query).First(&ci).Error
+	err := h.DB.Where("ip = ? OR hostname = ?", query, query).First(&ci).Error
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "CI not found"})
@@ -31,7 +31,7 @@ func CiLookupHandler(c *gin.Context) {
 	}
 
 	var vlans []models.VlanSubnet
-	if err := database.DB.Find(&vlans).Error; err == nil {
+	if err := h.DB.Find(&vlans).Error; err == nil {
 		ci.Vlan = database.MatchVLAN(ci.IP, vlans)
 	}
 
@@ -39,7 +39,7 @@ func CiLookupHandler(c *gin.Context) {
 }
 
 // CiSuggestHandler returns a list of CIs matching the prefix query.
-func CiSuggestHandler(c *gin.Context) {
+func (h *Handler) CiSuggestHandler(c *gin.Context) {
 	query := c.Query("query")
 	if query == "" {
 		c.JSON(http.StatusOK, []models.CI{})
@@ -50,7 +50,7 @@ func CiSuggestHandler(c *gin.Context) {
 
 	var cis []models.CI
 	searchTerm := query + "%"
-	database.DB.Limit(10).Where("hostname LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Find(&cis)
+	h.DB.Limit(10).Where("hostname LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Find(&cis)
 
 	c.JSON(http.StatusOK, cis)
 }

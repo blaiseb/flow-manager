@@ -24,28 +24,45 @@ type FlowSubmission struct {
 	Comment        string `form:"comment"`
 }
 
-func SubmitHandler(c *gin.Context) {
+type Submission struct {
+	Action string           `form:"action"`
+	Flows  []FlowSubmission `form:"flows"`
+}
+
+// SubmitHandler handles the submission of flow requests from the web form.
+func (h *Handler) SubmitHandler(c *gin.Context) {
 	if err := c.Request.ParseForm(); err != nil {
 		logger.Error("Failed to parse submission form", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
 		return
 	}
 
-	action := c.PostForm("action") // "generate" or "validate"
+	action := c.PostForm("action")
+	if action == "" {
+		action = "validate"
+	}
 	reference := "REF-" + time.Now().Format("20060102-150405")
 
-	// Group fields by row index
+	// Group fields by row index (manual parsing to support flows[idx].field format)
 	rows := make(map[string]*FlowSubmission)
 	for key, values := range c.Request.PostForm {
 		if !strings.HasPrefix(key, "flows[") {
 			continue
 		}
-		idx := key[6:strings.Index(key, "]")]
+		closeBracket := strings.Index(key, "]")
+		if closeBracket == -1 {
+			continue
+		}
+		idx := key[6:closeBracket]
 		if _, ok := rows[idx]; !ok {
 			rows[idx] = &FlowSubmission{}
 		}
 		val := values[0]
-		field := key[strings.Index(key, "].")+2:]
+		fieldIdx := strings.Index(key, "].")
+		if fieldIdx == -1 {
+			continue
+		}
+		field := key[fieldIdx+2:]
 		switch field {
 		case "source_hostname":
 			rows[idx].SourceHostname = val
@@ -67,6 +84,13 @@ func SubmitHandler(c *gin.Context) {
 	}
 
 	var flowsToExport []models.FlowRequest
+
+	// Pre-fetch VLANs once for the whole request
+	var vlans []models.VlanSubnet
+	if err := h.DB.Find(&vlans).Error; err != nil {
+		logger.Error("Failed to fetch VLANs for matching", "error", err)
+	}
+	parsedVlans := database.PreParseSubnets(vlans)
 
 	for _, sub := range rows {
 		ports := parsePorts(sub.Ports)
@@ -103,32 +127,39 @@ func SubmitHandler(c *gin.Context) {
 				Status:    "demandé",
 			}
 
-			if action == "validate" {
-				if err := database.DB.Create(&flow).Error; err != nil {
-					logger.Error("Failed to create flow request", "error", err)
-				}
-			}
-
 			// We need Hostnames for the Excel generation (even if not saved)
 			flow.SourceHostname = sub.SourceHostname
 			flow.TargetHostname = sub.TargetHostname
+
+			// Resolve VLANs for export
+			flow.SourceVlan = database.MatchVLANOptimized(flow.SourceIP, parsedVlans)
+			flow.TargetVlan = database.MatchVLANOptimized(flow.TargetIP, parsedVlans)
 
 			flowsToExport = append(flowsToExport, flow)
 		}
 
 		if action == "validate" {
 			if sub.SourceHostname != "" && sub.SourceIP != "" && !strings.Contains(sub.SourceIP, "/") {
-				ensureCI(sub.SourceHostname, sub.SourceIP)
+				h.ensureCI(sub.SourceHostname, sub.SourceIP)
 			}
 			if sub.TargetHostname != "" && sub.TargetIP != "" && !strings.Contains(sub.TargetIP, "/") {
-				ensureCI(sub.TargetHostname, sub.TargetIP)
+				h.ensureCI(sub.TargetHostname, sub.TargetIP)
 			}
+		}
+	}
+
+	if action == "validate" && len(flowsToExport) > 0 {
+		// Use batch insert for performance
+		if err := h.DB.CreateInBatches(flowsToExport, 100).Error; err != nil {
+			logger.Error("Failed to create flow requests in batch", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Échec de l'enregistrement des flux"})
+			return
 		}
 	}
 
 	if action == "generate" {
 		logger.Info("Generating Excel request (preview)", "count", len(flowsToExport))
-		f, err := GenerateExcelFile(flowsToExport)
+		f, err := h.GenerateExcelFile(flowsToExport)
 		if err == nil {
 			fileName := fmt.Sprintf("demande_draft_%s.xlsx", reference)
 			c.Header("Content-Type", "application/octet-stream")
@@ -142,7 +173,7 @@ func SubmitHandler(c *gin.Context) {
 
 	if action == "markdown" {
 		logger.Info("Generating Markdown request (preview)", "count", len(flowsToExport))
-		md := GenerateMarkdown(flowsToExport)
+		md := h.GenerateMarkdown(flowsToExport)
 		c.JSON(http.StatusOK, gin.H{"markdown": md})
 		return
 	}
@@ -152,7 +183,7 @@ func SubmitHandler(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/?tab=view")
 }
 
-func GenerateMarkdown(flows []models.FlowRequest) string {
+func (h *Handler) GenerateMarkdown(flows []models.FlowRequest) string {
 	var sb strings.Builder
 	sb.WriteString("bonjour, \nPouvez-vous réaliser les ouvertures de flux suivantes, \n\n")
 	sb.WriteString("| Source | Destination | Protocole | Port | Commentaire |\n")
@@ -198,14 +229,24 @@ func parsePorts(s string) []int {
 	var result []int
 	parts := strings.Split(s, ",")
 	for _, p := range parts {
+		if len(result) >= 100 {
+			break
+		}
 		p = strings.TrimSpace(p)
 		if strings.Contains(p, "-") {
 			rangeParts := strings.Split(p, "-")
 			if len(rangeParts) == 2 {
-				start, _ := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
-				end, _ := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
-				for i := start; i <= end; i++ {
-					result = append(result, i)
+				start, err1 := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+				end, err2 := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+				if err1 == nil && err2 == nil {
+					for i := start; i <= end; i++ {
+						if len(result) >= 100 {
+							break
+						}
+						result = append(result, i)
+					}
+				} else {
+					logger.Warn("Invalid port range", "range", p)
 				}
 			}
 		} else {
@@ -218,15 +259,15 @@ func parsePorts(s string) []int {
 	return result
 }
 
-func ensureCI(hostname, ip string) {
+func (h *Handler) ensureCI(hostname, ip string) {
 	var ci models.CI
-	err := database.DB.Where("ip = ?", ip).First(&ci).Error
+	err := h.DB.Where("ip = ?", ip).First(&ci).Error
 	if err != nil {
 		logger.Debug("Auto-creating CI", "hostname", hostname, "ip", ip)
-		database.DB.Create(&models.CI{Hostname: hostname, IP: ip})
+		h.DB.Create(&models.CI{Hostname: hostname, IP: ip})
 	} else if ci.Hostname == "" && hostname != "" {
 		logger.Debug("Updating existing CI Hostname", "ip", ip, "new_hostname", hostname)
 		ci.Hostname = hostname
-		database.DB.Save(&ci)
+		h.DB.Save(&ci)
 	}
 }
