@@ -25,7 +25,7 @@ var staticFS embed.FS
 //go:embed templates/*
 var templatesFS embed.FS
 
-const Version = "0.0.1"
+const Version = "0.0.2"
 
 func main() {
 	// Parsing flags
