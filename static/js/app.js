@@ -34,6 +34,21 @@ function copyMarkdown() {
     alert('Markdown copié !');
 }
 
+const standardFlows = {
+    'custom': { protocol: 'TCP', ports: '' },
+    'http':   { protocol: 'TCP', ports: '80' },
+    'https':  { protocol: 'TCP', ports: '443' },
+    'ssh':    { protocol: 'TCP', ports: '22' },
+    'rdp':    { protocol: 'TCP', ports: '3389' },
+    'dns':    { protocol: 'BOTH', ports: '53' },
+    'icmp':   { protocol: 'ICMP', ports: '0' },
+    'smb':    { protocol: 'TCP', ports: '445' },
+    'sql':    { protocol: 'TCP', ports: '1433' },
+    'oracle': { protocol: 'TCP', ports: '1521' },
+    'ldap':   { protocol: 'TCP', ports: '389' },
+    'ldaps':  { protocol: 'TCP', ports: '636' }
+};
+
 function addRow() {
     const tbody = document.getElementById('form-body');
     if (!tbody) return;
@@ -42,6 +57,7 @@ function addRow() {
     row.id = `row-${idx}`; row.className = 'form-row-inputs';
     let scopeOptions = `<option value="">-- Machine isolée --</option><option value="EXTERNAL">-- Externe (Hostname) --</option>`;
     availableVlans.forEach(v => { scopeOptions += `<option value="${v.subnet}">${v.name} (${v.subnet})</option>`; });
+    
     row.innerHTML = `
         <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">X</button></td>
         <td><select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'source')">${scopeOptions}</select><input type="text" name="flows[${idx}].source_vlan" class="form-control" id="source_vlan_${idx}" readonly placeholder="VLAN auto"></td>
@@ -50,8 +66,31 @@ function addRow() {
         <td><select class="form-select form-select-sm mb-1" onchange="selectScope(this, ${idx}, 'target')">${scopeOptions}</select><input type="text" name="flows[${idx}].target_vlan" class="form-control" id="target_vlan_${idx}" readonly placeholder="VLAN auto"></td>
         <td><input type="text" name="flows[${idx}].target_ip" class="form-control" id="target_ip_${idx}" placeholder="IP ou Subnet" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
         <td><input type="text" name="flows[${idx}].target_hostname" class="form-control" id="target_hostname_${idx}" placeholder="Hostname" list="ciSuggestions" oninput="updateSuggestions(this.value)"></td>
-        <td><select name="flows[${idx}].protocol" class="form-select"><option value="TCP">TCP</option><option value="UDP">UDP</option><option value="BOTH">TCP & UDP</option></select></td>
-        <td><input type="text" name="flows[${idx}].ports" class="form-control" placeholder="80, 443"></td>
+        <td>
+            <select class="form-select" id="flow_type_${idx}" onchange="applyStandardFlow(${idx}, this.value)">
+                <option value="custom">Manuel</option>
+                <option value="http">HTTP</option>
+                <option value="https">HTTPS</option>
+                <option value="ssh">SSH</option>
+                <option value="rdp">RDP</option>
+                <option value="dns">DNS</option>
+                <option value="icmp">ICMP (Ping)</option>
+                <option value="smb">SMB/CIFS</option>
+                <option value="sql">SQL Server</option>
+                <option value="oracle">Oracle DB</option>
+                <option value="ldap">LDAP</option>
+                <option value="ldaps">LDAPS</option>
+            </select>
+        </td>
+        <td>
+            <select name="flows[${idx}].protocol" id="protocol_${idx}" class="form-select">
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+                <option value="BOTH">TCP & UDP</option>
+                <option value="ICMP">ICMP</option>
+            </select>
+        </td>
+        <td><input type="text" name="flows[${idx}].ports" id="ports_${idx}" class="form-control"></td>
         <td><input type="date" name="flows[${idx}].time_limit" class="form-control"></td>
         <td><input type="text" name="flows[${idx}].comment" class="form-control"></td>
     `;
@@ -62,6 +101,13 @@ function addRow() {
             if (el) el.addEventListener('change', e => lookupCI(e.target.value, idx, t)); 
         }); 
     });
+}
+
+function applyStandardFlow(idx, type) {
+    const flow = standardFlows[type];
+    if (!flow) return;
+    document.getElementById(`protocol_${idx}`).value = flow.protocol;
+    document.getElementById(`ports_${idx}`).value = flow.ports;
 }
 
 function selectScope(selectEl, idx, type) {
@@ -98,118 +144,144 @@ async function lookupCI(q, idx, type) {
         let res = await fetch(`/ci/lookup?query=${encodeURIComponent(q)}`);
         if (res.ok) {
             let ci = await res.json(); if (ci.hostname) h.value = ci.hostname; if (ci.ip) i.value = ci.ip;
-            v.value = ci.vlan?.vlan || "";
-        } else if (q.match(/^(\d{1,3}\.){3}\d{1,3}$/)) {
-            let vres = await fetch(`/vlan/lookup?ip=${encodeURIComponent(q)}`);
-            if (vres.ok) { let data = await vres.json(); if (data.vlan?.vlan) v.value = data.vlan.vlan; }
+            if (ci.vlan_name) v.value = ci.vlan_name;
         }
     } catch (err) { console.error(err); }
 }
 
-function prepareVlanModal(v) {
-    document.getElementById('vlanId').value = v?.ID || ''; document.getElementById('vlanSubnet').value = v?.Subnet || '';
-    document.getElementById('vlanName').value = v?.VLAN || ''; document.getElementById('vlanGateway').value = v?.Gateway || '';
-    document.getElementById('vlanDNSServers').value = v?.DNSServers || '';
+function prepareVlanModal(vlan) {
+    document.getElementById('vlanModalLabel').innerText = vlan ? 'Modifier le VLAN' : 'Ajouter un VLAN';
+    document.getElementById('vlanId').value = vlan ? vlan.ID : '';
+    document.getElementById('vlanSubnet').value = vlan ? vlan.Subnet : '';
+    document.getElementById('vlanName').value = vlan ? vlan.VLAN : '';
+    document.getElementById('vlanGateway').value = vlan ? vlan.Gateway : '';
+    document.getElementById('vlanDNSServers').value = vlan ? vlan.DNSServers : '';
 }
 
 async function saveVlan() {
     const id = document.getElementById('vlanId').value;
-    const body = { subnet: document.getElementById('vlanSubnet').value, vlan: document.getElementById('vlanName').value, gateway: document.getElementById('vlanGateway').value, dns_servers: document.getElementById('vlanDNSServers').value };
-    const res = await fetch(id ? `/vlan/${id}` : '/vlan', { 
-        method: id ? 'PUT' : 'POST', 
-        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken}, 
-        body: JSON.stringify(body) 
+    const data = {
+        subnet: document.getElementById('vlanSubnet').value,
+        vlan: document.getElementById('vlanName').value,
+        gateway: document.getElementById('vlanGateway').value,
+        dns_servers: document.getElementById('vlanDNSServers').value
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/vlan/${id}` : '/vlan';
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify(data)
     });
-    if (res.ok) window.location.href = '/?tab=vlan'; else alert('Erreur');
+    if (res.ok) location.reload(); else alert('Erreur lors de la sauvegarde');
 }
 
-async function deleteVlan(id) { 
-    if (confirm('Supprimer ce VLAN ?')) { 
-        await fetch(`/vlan/${id}`, {method: 'DELETE', headers: {'X-CSRF-TOKEN': csrfToken}}); 
-        window.location.href = '/?tab=vlan'; 
-    } 
+async function deleteVlan(id) {
+    if (!confirm('Supprimer ce VLAN ?')) return;
+    const res = await fetch(`/vlan/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
+    if (res.ok) location.reload();
 }
 
 async function uploadVlanCSV() {
-    const input = document.getElementById('csvFileInput'); if (input.files.length === 0) return;
-    const formData = new FormData(); 
-    formData.append('file', input.files[0]);
-    formData.append('_csrf', csrfToken);
-    const res = await fetch('/vlan/import', {method: 'POST', body: formData});
-    if (res.ok) { const data = await res.json(); alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`); window.location.href = '/?tab=vlan'; } else alert('Erreur');
+    const file = document.getElementById('csvFileInput').files[0];
+    if (!file) return;
+    const formData = new FormData(); formData.append('file', file);
+    const res = await fetch('/vlan/import', {method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken }, body: formData});
+    if (res.ok) { const data = await res.json(); alert(data.message); location.reload(); } else alert('Erreur import');
 }
 
 function prepareCiModal(ci) {
-    document.getElementById('ciId').value = ci?.ID || ''; document.getElementById('ciHostname').value = ci?.Hostname || '';
-    document.getElementById('ciIP').value = ci?.IP || ''; document.getElementById('ciDescription').value = ci?.Description || '';
+    document.getElementById('ciModalLabel').innerText = ci ? 'Modifier le CI' : 'Ajouter un CI';
+    document.getElementById('ciId').value = ci ? ci.ID : '';
+    document.getElementById('ciHostname').value = ci ? ci.Hostname : '';
+    document.getElementById('ciIP').value = ci ? ci.IP : '';
+    document.getElementById('ciDescription').value = ci ? ci.Description : '';
 }
 
 async function saveCi() {
     const id = document.getElementById('ciId').value;
-    const body = { hostname: document.getElementById('ciHostname').value, ip: document.getElementById('ciIP').value, description: document.getElementById('ciDescription').value };
-    const res = await fetch(id ? `/ci/${id}` : '/ci', { 
-        method: id ? 'PUT' : 'POST', 
-        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken}, 
-        body: JSON.stringify(body) 
+    const data = {
+        hostname: document.getElementById('ciHostname').value,
+        ip: document.getElementById('ciIP').value,
+        description: document.getElementById('ciDescription').value
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/ci/${id}` : '/ci';
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify(data)
     });
-    if (res.ok) window.location.href = '/?tab=ci'; else { let e = await res.json(); alert(e.error); }
+    if (res.ok) location.reload(); else alert('Erreur lors de la sauvegarde');
 }
 
-async function deleteCi(id) { 
-    if (confirm('Supprimer ce CI ?')) { 
-        await fetch(`/ci/${id}`, {method: 'DELETE', headers: {'X-CSRF-TOKEN': csrfToken}}); 
-        window.location.href = '/?tab=ci'; 
-    } 
+async function deleteCi(id) {
+    if (!confirm('Supprimer ce CI ?')) return;
+    const res = await fetch(`/ci/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
+    if (res.ok) location.reload();
 }
 
 async function uploadCiCSV() {
-    const input = document.getElementById('ciCsvFileInput'); if (input.files.length === 0) return;
-    const formData = new FormData(); 
-    formData.append('file', input.files[0]);
-    formData.append('_csrf', csrfToken);
-    const res = await fetch('/ci/import', {method: 'POST', body: formData});
-    if (res.ok) { const data = await res.json(); alert(`Import réussi : ${data.created} créés, ${data.updated} mis à jour.`); window.location.href = '/?tab=ci'; } else alert('Erreur');
+    const file = document.getElementById('ciCsvFileInput').files[0];
+    if (!file) return;
+    const formData = new FormData(); formData.append('file', file);
+    const res = await fetch('/ci/import', {method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken }, body: formData});
+    if (res.ok) { const data = await res.json(); alert(data.message); location.reload(); } else alert('Erreur import');
 }
 
-function prepareFlowEditModal(f) {
-    document.getElementById('editFlowId').value = f.ID; document.getElementById('editRuleNumber').value = f.RuleNumber;
-    document.getElementById('editStatus').value = f.Status; document.getElementById('editComment').value = f.Comment;
+function prepareFlowEditModal(flow) {
+    document.getElementById('editFlowId').value = flow.ID;
+    document.getElementById('editRuleNumber').value = flow.RuleNumber;
+    document.getElementById('editStatus').value = flow.Status;
+    document.getElementById('editComment').value = flow.Comment;
 }
 
 async function saveFlowEdit() {
     const id = document.getElementById('editFlowId').value;
-    const res = await fetch(`/flow/${id}`, { 
-        method: 'PUT', 
-        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken}, 
-        body: JSON.stringify({ rule_number: document.getElementById('editRuleNumber').value, status: document.getElementById('editStatus').value, comment: document.getElementById('editComment').value }) 
+    const data = {
+        rule_number: document.getElementById('editRuleNumber').value,
+        status: document.getElementById('editStatus').value,
+        comment: document.getElementById('editComment').value
+    };
+    const res = await fetch(`/flow/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify(data)
     });
-    if (res.ok) window.location.reload(); else alert('Erreur');
+    if (res.ok) location.reload(); else alert('Erreur lors de la mise à jour');
 }
 
-function prepareUserModal(u) {
-    document.getElementById('userId').value = u?.ID || ''; document.getElementById('userUsername').value = u?.Username || '';
-    document.getElementById('userPassword').value = ''; document.getElementById('userRole').value = u?.Role || 'viewer';
-    document.getElementById('userModalLabel').innerText = u ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur';
+function prepareUserModal(user) {
+    document.getElementById('userModalLabel').innerText = user ? 'Modifier l\\'utilisateur' : 'Ajouter un utilisateur';
+    document.getElementById('userId').value = user ? user.ID : '';
+    document.getElementById('userUsername').value = user ? user.Username : '';
+    document.getElementById('userPassword').value = '';
+    document.getElementById('userRole').value = user ? user.Role : 'viewer';
 }
 
 async function saveUser() {
     const id = document.getElementById('userId').value;
-    const body = { username: document.getElementById('userUsername').value, password: document.getElementById('userPassword').value, role: document.getElementById('userRole').value };
-    const res = await fetch(id ? `/users/${id}` : '/users', { 
-        method: id ? 'PUT' : 'POST', 
-        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken}, 
-        body: JSON.stringify(body) 
+    const data = {
+        username: document.getElementById('userUsername').value,
+        password: document.getElementById('userPassword').value,
+        role: document.getElementById('userRole').value
+    };
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/user/${id}` : '/user';
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+        body: JSON.stringify(data)
     });
-    if (res.ok) window.location.href = '/?tab=admin'; else alert('Erreur lors de la sauvegarde');
+    if (res.ok) location.reload(); else alert('Erreur lors de la sauvegarde');
 }
 
-async function deleteUser(id) { 
-    if (confirm('Supprimer cet utilisateur ?')) { 
-        await fetch(`/users/${id}`, {method: 'DELETE', headers: {'X-CSRF-TOKEN': csrfToken}}); 
-        window.location.href = '/?tab=admin'; 
-    } 
+async function deleteUser(id) {
+    if (!confirm('Supprimer cet utilisateur ?')) return;
+    const res = await fetch(`/user/${id}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken } });
+    if (res.ok) location.reload();
 }
 
-document.addEventListener('DOMContentLoaded', () => { 
-    if(document.getElementById('home-tab')?.classList.contains('active')) addRow(); 
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('form-body')) addRow();
 });
