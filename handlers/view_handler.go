@@ -6,6 +6,7 @@ import (
 	"flow-manager/models"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -69,12 +70,31 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 		activeTab = "view"
 		searchTerm := "%" + searchQuery + "%"
 		
+		// 1. Collecter les IPs des CIs correspondant au nom/IP recherché
 		var matchingIPs []string
 		h.DB.Model(&models.CI{}).Where("hostname LIKE ? OR ip LIKE ?", searchTerm, searchTerm).Pluck("ip", &matchingIPs)
 
-		if len(matchingIPs) > 0 {
-			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ? OR source_ip IN ? OR target_ip IN ?", 
-				searchTerm, searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs)
+		// 2. Identifier les VLANs correspondants au nom ou au subnet recherché
+		var matchingVlanSubnets []string
+		for _, v := range vlans {
+			if strings.Contains(strings.ToLower(v.VLAN), strings.ToLower(searchQuery)) || 
+			   strings.Contains(v.Subnet, searchQuery) {
+				matchingVlanSubnets = append(matchingVlanSubnets, v.Subnet)
+				
+				// 3. Pour chaque VLAN trouvé, ajouter les IPs de tous les hosts de ce VLAN
+				for _, ci := range cis {
+					if ci.Vlan != nil && ci.Vlan.ID == v.ID {
+						matchingIPs = append(matchingIPs, ci.IP)
+					}
+				}
+			}
+		}
+
+		// Construire la requête finale avec les IPs des CIs et les subnets des VLANs
+		if len(matchingIPs) > 0 || len(matchingVlanSubnets) > 0 {
+			// On cherche dans source/target soit le terme direct, soit les IPs trouvées, soit les subnets trouvés
+			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ? OR source_ip IN ? OR target_ip IN ? OR source_ip IN ? OR target_ip IN ?", 
+				searchTerm, searchTerm, searchTerm, searchTerm, matchingIPs, matchingIPs, matchingVlanSubnets, matchingVlanSubnets)
 		} else {
 			db = db.Where("source_ip LIKE ? OR target_ip LIKE ? OR comment LIKE ? OR reference LIKE ?", 
 				searchTerm, searchTerm, searchTerm, searchTerm)
