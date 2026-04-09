@@ -264,7 +264,13 @@
                                         {{ range .VlanIPs }}
                                         <tr>
                                             <td><code>{{ .IP }}</code></td>
-                                            <td>{{ if .HasCI }}{{ .Hostname }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
+                                            <td>
+                                                {{ if .HasCI }}
+                                                    <a href="/?tab=ci&ci_id={{ .CID }}">{{ .Hostname }}</a>
+                                                {{ else }}
+                                                    <small class="text-muted">-</small>
+                                                {{ end }}
+                                            </td>
                                             <td>{{ if .HasCI }}{{ .Description }}{{ else }}<small class="text-muted">-</small>{{ end }}</td>
                                             <td><a href="/?tab=view&search={{ .IP }}" class="btn btn-sm btn-link p-0">Voir flux</a></td>
                                         </tr>
