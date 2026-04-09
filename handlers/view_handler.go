@@ -101,7 +101,9 @@ func (h *Handler) ViewHandler(c *gin.Context) {
 		}
 	}
 
-	db.Preload("SourceCI").Preload("TargetCI").Order("created_at desc").Find(&flows)
+	db.Preload("SourceCI").Preload("TargetCI").Preload("History", func(db *gorm.DB) *gorm.DB {
+		return db.Order("created_at desc")
+	}).Order("created_at desc").Find(&flows)
 
 	for i := range flows {
 		if flows[i].SourceCI != nil {

@@ -310,11 +310,28 @@ async function uploadCiCSV() {
     if (res.ok) { const data = await res.json(); alert(data.message); location.reload(); } else alert('Erreur import');
 }
 
-function prepareFlowEditModal(flow) {
-    document.getElementById('editFlowId').value = flow.ID;
-    document.getElementById('editRuleNumber').value = flow.RuleNumber;
-    document.getElementById('editStatus').value = flow.Status;
-    document.getElementById('editComment').value = flow.Comment;
+function prepareFlowEditModal(id, ruleNumber, status, comment, history) {
+    document.getElementById('editFlowId').value = id;
+    document.getElementById('editRuleNumber').value = ruleNumber;
+    document.getElementById('editStatus').value = status;
+    document.getElementById('editComment').value = comment;
+
+    const historyTbody = document.getElementById('flowHistoryTableBody');
+    historyTbody.innerHTML = '';
+    if (history && history.length > 0) {
+        history.forEach(h => {
+            const tr = document.createElement('tr');
+            const date = new Date(h.CreatedAt).toLocaleString('fr-FR');
+            tr.innerHTML = `
+                <td>${date}</td>
+                <td><span class="badge ${h.status === 'terminé' ? 'bg-success' : 'bg-secondary'}">${h.status}</span></td>
+                <td>${h.actor}</td>
+            `;
+            historyTbody.appendChild(tr);
+        });
+    } else {
+        historyTbody.innerHTML = '<tr><td colspan="3" class="text-center">Aucun historique</td></tr>';
+    }
 }
 
 async function saveFlowEdit() {

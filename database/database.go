@@ -228,7 +228,7 @@ func InitDatabase() *gorm.DB {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
 
-	err = db.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{}, &models.StandardFlow{})
+	err = db.AutoMigrate(&models.FlowRequest{}, &models.VlanSubnet{}, &models.CI{}, &models.User{}, &models.StandardFlow{}, &models.FlowHistory{})
 	if err != nil {
 		logger.Fatal("Failed to migrate database", "error", err)
 	}

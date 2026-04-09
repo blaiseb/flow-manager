@@ -122,7 +122,6 @@
                         <table class="table table-striped table-hover">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
                                     <th>Référence</th>
                                     <th>Source</th>
                                     <th>Cible</th>
@@ -132,6 +131,7 @@
                                     <th>Rule #</th>
                                     <th>Date</th>
                                     <th>Statut</th>
+                                    <th>Acteur</th>
                                     <th>Commentaire</th>
                                     <th>Actions</th>
                                 </tr>
@@ -139,7 +139,6 @@
                             <tbody>
                                 {{ range .Flows }}
                                 <tr>
-                                    <td>{{ .ID }}</td>
                                     <td><a href="/?tab=view&search={{ .Reference }}"><small><code>{{ .Reference }}</code></small></a></td>
                                     <td>
                                         {{ if .SourceHostname }}
@@ -164,23 +163,24 @@
                                     <td>{{ .Port }}</td>
                                     <td>{{ if .TimeLimit }}{{ .TimeLimit.Format "02/01/2006" }}{{ else }}Sans limite{{ end }}</td>
                                     <td>{{ .RuleNumber }}</td>
-                                    <td>{{ if .ImplementedAt }}{{ .ImplementedAt.Format "02/01/2006" }}{{ else }}-{{ end }}</td>
+                                    <td>{{ if .ImplementedAt }}{{ .ImplementedAt.Format "02/01/2006 15:04" }}{{ else }}-{{ end }}</td>
                                     <td>
                                         <span class="badge {{ if eq .Status "terminé" }}bg-success{{ else if eq .Status "refusé" }}bg-danger{{ else if eq .Status "en cours" }}bg-warning{{ else }}bg-secondary{{ end }}">
                                             {{ .Status }}
                                         </span>
                                     </td>
+                                    <td><small>{{ if .LastActor }}{{ .LastActor }}{{ else }}-{{ end }}</small></td>
                                     <td>{{ .Comment }}</td>
                                     <td>
                                         {{ if (or (eq $.User.Role "actor") (eq $.User.Role "admin")) }}
-                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#flowEditModal" onclick="prepareFlowEditModal({ID: {{.ID}}, RuleNumber: '{{.RuleNumber}}', Status: '{{.Status}}', Comment: '{{.Comment}}'})">Modifier</button>
+                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#flowEditModal" onclick='prepareFlowEditModal({{ .ID }}, "{{ .RuleNumber }}", "{{ .Status }}", "{{ .Comment }}", {{ JSONMarshal .History }})'>Modifier</button>
                                         {{ else }}
                                         -
                                         {{ end }}
                                     </td>
                                 </tr>
                                 {{ else }}
-                                <tr><td colspan="12" class="text-center">Aucun flux à afficher.</td></tr>
+                                <tr><td colspan="11" class="text-center">Aucun flux à afficher.</td></tr>
                                 {{ end }}
                             </tbody>
                         </table>
@@ -458,7 +458,7 @@
     </div>
 
     <div class="modal fade" id="flowEditModal" tabindex="-1">
-        <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Mise à jour du flux</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="flowEditForm"><input type="hidden" id="editFlowId"><div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div><div class="mb-3"><label class="form-label">Statut</label><select class="form-select" id="editStatus"><option value="demandé">Demandé</option><option value="en cours">En cours</option><option value="terminé">Terminé</option><option value="refusé">Refusé</option></select></div><div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="3"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button></div></div></div>
+        <div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Mise à jour du flux</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="flowEditForm"><input type="hidden" id="editFlowId"><div class="row"><div class="col-md-6"><div class="mb-3"><label class="form-label">Rule Number</label><input type="text" class="form-control" id="editRuleNumber"></div></div><div class="col-md-6"><div class="mb-3"><label class="form-label">Statut</label><select class="form-select" id="editStatus"><option value="demandé">Demandé</option><option value="en cours">En cours</option><option value="terminé">Terminé</option><option value="refusé">Refusé</option></select></div></div></div><div class="mb-3"><label class="form-label">Commentaire</label><textarea class="form-control" id="editComment" rows="2"></textarea></div></form><hr><h6>Historique des modifications</h6><div class="table-responsive"><table class="table table-sm table-striped border"><thead><tr><th>Date</th><th>Statut</th><th>Acteur</th></tr></thead><tbody id="flowHistoryTableBody"></tbody></table></div></div><div class="modal-footer"><button type="button" class="btn btn-primary" onclick="saveFlowEdit()">Sauvegarder</button></div></div></div>
     </div>
 
     <div class="modal fade" id="userModal" tabindex="-1">

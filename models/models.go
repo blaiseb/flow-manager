@@ -34,16 +34,28 @@ type FlowRequest struct {
 	RuleNumber    string     `json:"rule_number"`
 	ImplementedAt *time.Time `json:"implemented_at"`
 	Status        string     `json:"status" gorm:"default:'demandé';not null"`
+	LastActor     string     `json:"last_actor"`
 
 	// Associations SQL
 	SourceCI *CI `json:"-" gorm:"foreignKey:SourceIP;references:IP"`
 	TargetCI *CI `json:"-" gorm:"foreignKey:TargetIP;references:IP"`
+	History  []FlowHistory `json:"history" gorm:"foreignKey:FlowID"`
 
 	// Champs d'affichage dynamique (non stockés)
 	SourceHostname string      `json:"source_hostname" gorm:"-"`
 	SourceVlan     *VlanSubnet `json:"source_vlan" gorm:"-"`
 	TargetHostname string      `json:"target_hostname" gorm:"-"`
 	TargetVlan     *VlanSubnet `json:"target_vlan" gorm:"-"`
+}
+
+// FlowHistory tracks changes to a FlowRequest.
+type FlowHistory struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	FlowID    uint      `json:"flow_id" gorm:"index"`
+	CreatedAt time.Time `json:"created_at"`
+	Status    string    `json:"status"`
+	Actor     string    `json:"actor"`
+	Comment   string    `json:"comment"`
 }
 
 const (
@@ -60,20 +72,12 @@ type User struct {
 	Role     string `json:"role" gorm:"default:'viewer';not null" binding:"required,oneof=viewer requestor actor admin"`
 }
 
-func (fr *FlowRequest) BeforeUpdate(tx *gorm.DB) (err error) {
-	if fr.Status == "terminé" {
-		now := time.Now()
-		fr.ImplementedAt = &now
-	}
-	return
-}
-
 // VlanSubnet represents a VLAN / Subnet.
 // StandardFlow represents a pre-defined flow type (e.g., HTTPS -> TCP/443).
 type StandardFlow struct {
 	gorm.Model
-	Name     string `json:"name" gorm:"unique;not null" binding: "required"`
-	Protocol string `json:"protocol" gorm:"not null" binding: "required"`
+	Name     string `json:"name" gorm:"unique;not null" binding:"required"`
+	Protocol string `json:"protocol" gorm:"not null" binding:"required"`
 	Ports    string `json:"ports"`
 }
 

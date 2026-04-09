@@ -30,24 +30,39 @@ func (h *Handler) UpdateFlow(c *gin.Context) {
 		return
 	}
 
-	logger.Info("Updating flow", "id", id, "new_status", input.Status)
-
-	if input.Status == "terminé" && flow.Status != "terminé" {
-		now := time.Now()
-		flow.ImplementedAt = &now
-	} else if input.Status != "terminé" {
-		flow.ImplementedAt = nil
+	// Current User as Actor
+	actorName := "System"
+	if val, ok := c.Get("user"); ok {
+		if u, ok := val.(models.User); ok {
+			actorName = u.Username
+		}
 	}
+
+	logger.Info("Updating flow", "id", id, "new_status", input.Status, "actor", actorName)
+
+	// Update date on every action
+	now := time.Now()
+	flow.ImplementedAt = &now
 
 	flow.RuleNumber = input.RuleNumber
 	flow.Status = input.Status
 	flow.Comment = input.Comment
+	flow.LastActor = actorName
 
 	if err := h.DB.Save(&flow).Error; err != nil {
 		logger.Error("Failed to save updated flow", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update flow: " + err.Error()})
 		return
 	}
+
+	// Create history entry
+	history := models.FlowHistory{
+		FlowID:  flow.ID,
+		Status:  input.Status,
+		Actor:   actorName,
+		Comment: input.Comment,
+	}
+	h.DB.Create(&history)
 
 	c.JSON(http.StatusOK, flow)
 }
